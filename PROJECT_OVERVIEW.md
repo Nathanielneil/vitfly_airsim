@@ -54,10 +54,10 @@ VitFly-AirSim
 ## 技术优势
 
 ### 🧠 **先进算法**
-- **Vision Transformer**: 利用注意力机制处理空间信息
-- **高效自注意力**: 降维减少计算复杂度
-- **混合前馈网络**: 结合卷积和全连接优势
-- **专家策略学习**: 行为克隆从特权专家学习
+- **Vision Transformer**: 利用注意力机制处理空间信息，相比CNN能更好捕获全局依赖关系
+- **高效自注意力**: 通过降维减少计算复杂度，支持实时推理
+- **混合前馈网络**: 结合卷积和全连接优势，兼顾局部特征和全局理解
+- **专家策略学习**: 行为克隆从特权专家学习，避免强化学习的样本效率问题
 
 ### ⚡ **性能优化**
 - **实时推理**: 优化的模型架构，支持30Hz控制
@@ -146,7 +146,7 @@ vitfly_airsim/
 
 1. **安装系统**
    ```cmd
-   git clone <repo-url> vitfly_airsim
+   git clone https://github.com/Nathanielneil/vitfly_airsim.git
    cd vitfly_airsim
    scripts\install_windows.bat
    ```
@@ -211,8 +211,8 @@ vitfly_airsim/
 ### 📚 **文档资源**
 - [安装指南](INSTALL.md) - 详细安装步骤
 - [用户手册](README.md) - 完整使用说明
-- [API文档](docs/) - 代码接口文档
-- [常见问题](FAQ.md) - 问题解答
+- [项目概览](PROJECT_OVERVIEW.md) - 项目架构和特性说明
+- [GitHub仓库](https://github.com/Nathanielneil/vitfly_airsim) - 源代码和问题报告
 
 ### 🛠️ **开发支持**
 - **代码规范**: PEP8 + Black格式化
