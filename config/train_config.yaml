@@ -1,0 +1,61 @@
+# VitFly-AirSim Training Configuration
+
+# Data Configuration
+data_dir: "data/training_data"  # Path to training data directory
+val_split: 0.2                 # Validation split ratio
+batch_size: 32                 # Batch size for training
+num_workers: 4                 # Number of data loader workers
+target_height: 60              # Target height for depth images
+target_width: 90               # Target width for depth images
+short: 0                       # Limit number of trajectories (0 = use all)
+seed: 42                       # Random seed for reproducibility
+
+# Model Configuration
+model_type: "ViTLSTM"          # Model type: ViT, ViTLSTM, ConvNet, LSTMNet, UNet
+
+# Training Configuration
+num_epochs: 100                # Number of training epochs
+learning_rate: 1e-4            # Learning rate
+optimizer: "adam"              # Optimizer: adam, sgd
+weight_decay: 0.0              # Weight decay for regularization
+grad_clip: 1.0                 # Gradient clipping value (0 = no clipping)
+
+# Learning Rate Scheduling
+use_scheduler: true            # Whether to use learning rate scheduler
+scheduler_type: "cosine"       # Scheduler type: cosine, step
+min_lr: 1e-6                   # Minimum learning rate for cosine scheduler
+scheduler_step_size: 30        # Step size for step scheduler
+scheduler_gamma: 0.1           # Gamma for step scheduler
+
+# Device Configuration
+device: "auto"                 # Device: auto, cpu, cuda
+
+# Output Configuration
+output_dir: "outputs"          # Base output directory
+workspace_suffix: ""           # Suffix for workspace directory
+
+# Checkpointing and Logging
+save_interval: 10              # Save model every N epochs
+val_interval: 1                # Validate every N epochs
+log_interval: 50               # Log training progress every N batches
+tensorboard_interval: 25       # Log to tensorboard every N batches
+
+# Resume Training
+load_checkpoint: false         # Whether to load from checkpoint
+checkpoint_path: ""            # Path to checkpoint file
+
+# Example advanced configurations (uncomment to use):
+# 
+# # Use different batch size for different models
+# batch_size: 16  # Smaller batch size for larger models like ViTLSTM
+# 
+# # Use different learning rates
+# learning_rate: 5e-5  # Lower learning rate for fine-tuning
+# 
+# # Enable different scheduler settings
+# scheduler_type: "step"
+# scheduler_step_size: 25
+# scheduler_gamma: 0.5
+# 
+# # Use subset of data for quick testing
+# short: 5  # Use only 5 trajectories for testing

@@ -1,0 +1,105 @@
+# VitFly-AirSim .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyTorch
+*.pth
+*.pt
+*.pkl
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+*.bat.bak
+*.cmd.bak
+
+# Data directories
+data/training_data/
+data/collected_data/
+data/eval_data/
+
+# Output directories
+outputs/
+logs/
+results/
+evaluation_results/
+
+# Model files
+models/*.pth
+models/*.pt
+models/*.pkl
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# AirSim logs
+AirSimLogs/
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Environment variables
+.env
+.env.local
+
+# Tensorboard logs
+runs/
+tensorboard_logs/
+
+# Backup files
+*.bak
+*.backup
+
+# Compiled files
+*.pyc
+*.pyo

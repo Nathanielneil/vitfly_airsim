@@ -1,0 +1,77 @@
+# VitFly-AirSim Simulation Configuration
+
+# Simulation Mode
+mode: "expert"  # Options: expert, model, data_collection
+
+# AirSim Connection
+airsim_host: "127.0.0.1"       # AirSim server host
+airsim_port: 41451             # AirSim server port
+
+# Flight Parameters
+desired_velocity: 5.0          # Desired forward velocity (m/s)
+flight_altitude: -5.0          # Flight altitude in AirSim coordinates (negative = up)
+max_duration: 30.0             # Maximum flight duration (seconds)
+control_frequency: 10.0        # Control loop frequency (Hz)
+stop_on_collision: true        # Stop simulation on collision
+
+# Model Configuration (for model mode)
+use_model: false               # Whether to use trained model
+model_path: "models/vitlstm_best.pth"  # Path to trained model
+model_type: "ViTLSTM"          # Model type
+device: "auto"                 # Device for model inference
+
+# Data Collection (for data_collection mode)
+collect_data: false            # Whether to collect training data
+data_output_dir: "collected_data"  # Output directory for collected data
+num_trajectories: 10          # Number of trajectories to collect
+trajectory_duration: 30.0     # Duration of each trajectory
+
+# Visualization
+enable_visualization: true     # Enable real-time visualization
+show_obstacles: true          # Show detected obstacles
+show_velocity_commands: true   # Show velocity command arrows
+
+# Safety Parameters
+enable_safety: true           # Enable safety features
+min_altitude: -50.0           # Minimum altitude (AirSim coordinates)
+max_altitude: -2.0            # Maximum altitude (AirSim coordinates)
+safety_distance: 2.0          # Minimum distance from obstacles
+
+# Obstacle Detection
+obstacle_inflation_factor: 0.6    # Obstacle inflation for safety
+obstacle_distance_threshold: 8.0  # Maximum distance to consider obstacles
+grid_center_offset: 8.0          # Grid center offset for path planning
+grid_displacement: 0.5           # Grid resolution for path planning
+
+# Expert Policy Parameters
+x_displacement: 8.0           # Forward displacement for waypoints
+
+# Logging
+log_performance: true         # Log performance metrics
+log_file: "simulation_log.txt"  # Log file name
+
+# Example configurations for different modes:
+
+# Expert Policy Mode (default)
+# mode: "expert"
+# collect_data: false
+# use_model: false
+
+# Model Inference Mode
+# mode: "model"
+# use_model: true
+# model_path: "models/vitlstm_best.pth"
+# model_type: "ViTLSTM"
+# collect_data: false
+
+# Data Collection Mode
+# mode: "data_collection"
+# collect_data: true
+# num_trajectories: 20
+# trajectory_duration: 45.0
+# use_model: false
+
+# High-speed testing
+# desired_velocity: 7.0
+# control_frequency: 30.0
+# safety_distance: 1.5
