@@ -53,7 +53,7 @@ vitfly_airsim/
 
 ```bash
 # 克隆仓库
-git clone <repo_url> vitfly_airsim
+git clone [<repo_url> https://github.com/Nathanielneil/vitfly_airsim.git]
 cd vitfly_airsim
 
 # 安装Python依赖
