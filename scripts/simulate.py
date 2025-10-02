@@ -73,19 +73,19 @@ class SimulationRunner:
                 host=self.config.get('airsim_host', '127.0.0.1'),
                 port=self.config.get('airsim_port', 41451)
             )
-            
+
             if not self.client.connect():
                 raise RuntimeError("Failed to connect to AirSim")
-            
+
             # Initialize drone
             if not self.client.initialize_drone():
                 raise RuntimeError("Failed to initialize drone")
-            
+
             # Create components
             self.sensor_manager = SensorManager(self.client.client, self.client.drone_name)
             self.controller = DroneController(self.client, self.sensor_manager)
             self.obstacle_detector = ObstacleDetector(self.sensor_manager, self.config)
-            
+
             # Load model if specified
             if self.config.get('use_model', False):
                 self.model_inference = ModelInference(
@@ -93,23 +93,80 @@ class SimulationRunner:
                     model_type=self.config['model_type'],
                     device=self.config.get('device', 'auto')
                 )
-            
+
             # Setup data collection if requested
             if self.config.get('collect_data', False):
                 self.data_collector = DataCollector(
                     self.client, self.sensor_manager, self.obstacle_detector,
                     output_dir=self.config.get('data_output_dir', 'collected_data')
                 )
-            
+
             # Setup visualization if requested
             if self.config.get('enable_visualization', True):
                 self.visualizer = SimulationVisualizer()
-            
+
+            # Setup telemetry recording if requested
+            telemetry_path = self.config.get('record_telemetry')
+            if telemetry_path:
+                self._setup_telemetry_recording(telemetry_path)
+
             self.logger.info("Simulation setup completed")
-            
+
         except Exception as e:
             self.logger.error(f"Setup failed: {e}")
             raise
+
+    def _setup_telemetry_recording(self, output_path: str):
+        """Setup CSV file for telemetry recording"""
+        try:
+            self.telemetry_file = open(output_path, 'w', newline='')
+            self.telemetry_writer = csv.writer(self.telemetry_file)
+
+            # Write header
+            self.telemetry_writer.writerow([
+                'timestamp',
+                'position_x', 'position_y', 'position_z',
+                'velocity_x', 'velocity_y', 'velocity_z',
+                'orientation_w', 'orientation_x', 'orientation_y', 'orientation_z',
+                'desired_velocity',
+                'collision'
+            ])
+
+            self.logger.info(f"Telemetry recording enabled: {output_path}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to setup telemetry recording: {e}")
+            raise
+
+    def _record_telemetry(self, velocity_command: tuple, desired_velocity: float):
+        """Record current telemetry data to CSV"""
+        if not self.telemetry_writer:
+            return
+
+        try:
+            # Get current state
+            position = self.client.get_position()
+            orientation = self.client.get_orientation()
+            collision_info = self.client.get_collision_info()
+
+            if position is None or orientation is None:
+                return
+
+            # Calculate timestamp from start
+            current_time = time.time() - self.start_time
+
+            # Write data row
+            self.telemetry_writer.writerow([
+                f'{current_time:.3f}',
+                f'{position[0]:.3f}', f'{position[1]:.3f}', f'{position[2]:.3f}',
+                f'{velocity_command[0]:.3f}', f'{velocity_command[1]:.3f}', f'{velocity_command[2]:.3f}',
+                f'{orientation[0]:.4f}', f'{orientation[1]:.4f}', f'{orientation[2]:.4f}', f'{orientation[3]:.4f}',
+                f'{desired_velocity:.2f}',
+                '1' if collision_info.get('has_collided', False) else '0'
+            ])
+
+        except Exception as e:
+            self.logger.warning(f"Failed to record telemetry: {e}")
     
     def takeoff(self):
         """Takeoff sequence"""
@@ -141,14 +198,14 @@ class SimulationRunner:
     def run_expert_policy(self):
         """Run expert obstacle avoidance policy"""
         self.logger.info("Running expert policy simulation...")
-        
+
         desired_velocity = self.config.get('desired_velocity', 5.0)
         max_duration = self.config.get('max_duration', 30.0)
         control_frequency = self.config.get('control_frequency', 10.0)
-        
+
         start_time = time.time()
         control_period = 1.0 / control_frequency
-        
+
         while self.running and (time.time() - start_time) < max_duration:
             loop_start = time.time()
 
@@ -162,19 +219,22 @@ class SimulationRunner:
             depth_image = self.sensor_manager.get_depth_image()
             if depth_image is not None:
                 obstacles = self.obstacle_detector.detect_obstacles_from_depth(depth_image)
-            
+
             # Compute expert velocity command
             velocity_command = self.obstacle_detector.compute_expert_velocity_command(
                 position, desired_velocity
             )
-            
+
             # Send velocity command
             self.controller.set_velocity_command(*velocity_command, duration=control_period)
-            
+
+            # Record telemetry for video annotation
+            self._record_telemetry(velocity_command, desired_velocity)
+
             # Data collection
             if self.data_collector and self.data_collector.is_collecting:
                 self.data_collector.collect_data_point(desired_velocity, velocity_command)
-            
+
             # Visualization
             if self.visualizer:
                 self.visualizer.update(depth_image, velocity_command, obstacles)
@@ -190,55 +250,58 @@ class SimulationRunner:
                     self.last_collision_timestamp = collision_time
                     if self.config.get('stop_on_collision', True):
                         break
-            
+
             # Maintain control frequency
             elapsed = time.time() - loop_start
             if elapsed < control_period:
                 time.sleep(control_period - elapsed)
-        
+
         self.logger.info("Expert policy simulation completed")
     
     def run_model_inference(self):
         """Run model-based control"""
         if not self.model_inference:
             raise RuntimeError("Model inference not initialized")
-        
+
         self.logger.info("Running model inference simulation...")
-        
+
         desired_velocity = self.config.get('desired_velocity', 5.0)
         max_duration = self.config.get('max_duration', 30.0)
         control_frequency = self.config.get('control_frequency', 30.0)
-        
+
         start_time = time.time()
         control_period = 1.0 / control_frequency
-        
+
         while self.running and (time.time() - start_time) < max_duration:
             loop_start = time.time()
-            
+
             # Get sensor data
             depth_image, success = self.sensor_manager.get_processed_depth_for_model()
             if not success:
                 continue
-            
+
             # Get drone state
             position = self.client.get_position()
             orientation = self.client.get_orientation()
-            
+
             if position is None or orientation is None:
                 continue
-            
+
             # Run model inference
             velocity_command = self.model_inference.predict_velocity(
                 depth_image, desired_velocity, orientation
             )
-            
+
             # Send velocity command
             self.controller.set_velocity_command(*velocity_command, duration=control_period)
-            
+
+            # Record telemetry for video annotation
+            self._record_telemetry(velocity_command, desired_velocity)
+
             # Data collection
             if self.data_collector and self.data_collector.is_collecting:
                 self.data_collector.collect_data_point(desired_velocity, velocity_command)
-            
+
             # Visualization
             if self.visualizer:
                 # Convert depth for visualization
@@ -256,12 +319,12 @@ class SimulationRunner:
                     self.last_collision_timestamp = collision_time
                     if self.config.get('stop_on_collision', True):
                         break
-            
+
             # Maintain control frequency
             elapsed = time.time() - loop_start
             if elapsed < control_period:
                 time.sleep(control_period - elapsed)
-        
+
         self.logger.info("Model inference simulation completed")
     
     def run_data_collection(self):
@@ -303,21 +366,24 @@ class SimulationRunner:
     def run(self):
         """Main simulation loop"""
         self.running = True
-        
+
         try:
             # Setup simulation
             self.setup()
-            
+
             # Takeoff
             self.takeoff()
-            
+
+            # Initialize start time for telemetry recording
+            self.start_time = time.time()
+
             # Start data collection if requested
             if self.data_collector and self.config.get('collect_data', False):
                 self.data_collector.start_trajectory_collection()
-            
+
             # Run simulation based on mode
             mode = self.config.get('mode', 'expert')
-            
+
             if mode == 'expert':
                 self.run_expert_policy()
             elif mode == 'model':
@@ -326,7 +392,7 @@ class SimulationRunner:
                 self.run_data_collection()
             else:
                 raise ValueError(f"Unknown simulation mode: {mode}")
-            
+
         except KeyboardInterrupt:
             self.logger.info("Simulation interrupted by user")
         except Exception as e:
@@ -338,20 +404,28 @@ class SimulationRunner:
     def cleanup(self):
         """Cleanup simulation"""
         self.running = False
-        
+
         if self.controller:
             self.controller.emergency_stop()
-        
+
         if self.data_collector and self.data_collector.is_collecting:
             self.data_collector.stop_trajectory_collection()
-        
+
+        # Close telemetry file
+        if self.telemetry_file:
+            try:
+                self.telemetry_file.close()
+                self.logger.info("Telemetry recording saved")
+            except Exception as e:
+                self.logger.warning(f"Error closing telemetry file: {e}")
+
         if self.client:
             self.client.land()
             self.client.disconnect()
-        
+
         if self.visualizer:
             self.visualizer.close()
-        
+
         self.logger.info("Simulation cleanup completed")
 
 
@@ -398,19 +472,21 @@ def main():
                        help='Override desired velocity from config')
     parser.add_argument('--max-duration', type=float,
                        help='Override max duration from config')
+    parser.add_argument('--record-telemetry', type=str,
+                       help='Record telemetry data to CSV file for video annotation')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='Logging level')
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
-    
+
     # Load configuration
     config = load_config(args.config)
-    
+
     # Override with command line arguments
     if args.mode:
         config['mode'] = args.mode
@@ -423,6 +499,8 @@ def main():
         config['desired_velocity'] = args.desired_velocity
     if args.max_duration:
         config['max_duration'] = args.max_duration
+    if args.record_telemetry:
+        config['record_telemetry'] = args.record_telemetry
     
     # Create and run simulation
     runner = SimulationRunner(config)
