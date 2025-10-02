@@ -34,9 +34,9 @@ def test_model_creation():
     for name, model_class in models.items():
         try:
             model = model_class()
-            print(f"  ✓ {name} created successfully")
+            print(f"   {name} created successfully")
         except Exception as e:
-            print(f"  ✗ {name} failed: {e}")
+            print(f"   {name} failed: {e}")
             return False
     
     return True
@@ -78,18 +78,18 @@ def test_model_forward_pass():
             # Check output shape
             expected_shape = (batch_size, 3)
             if output.shape != expected_shape:
-                print(f"  ✗ {name} output shape mismatch: got {output.shape}, expected {expected_shape}")
+                print(f"   {name} output shape mismatch: got {output.shape}, expected {expected_shape}")
                 return False
             
             # Check output range (should be reasonable velocity commands)
             if torch.isnan(output).any() or torch.isinf(output).any():
-                print(f"  ✗ {name} output contains NaN or Inf")
+                print(f"   {name} output contains NaN or Inf")
                 return False
             
-            print(f"  ✓ {name} forward pass successful (output shape: {output.shape})")
+            print(f"   {name} forward pass successful (output shape: {output.shape})")
             
         except Exception as e:
-            print(f"  ✗ {name} forward pass failed: {e}")
+            print(f"   {name} forward pass failed: {e}")
             return False
     
     return True
@@ -123,12 +123,12 @@ def test_model_parameters():
             expected = expected_params[name]
             
             if abs(actual_params - expected) / expected > tolerance:
-                print(f"  ⚠ {name} parameter count mismatch: got {actual_params:,}, expected {expected:,}")
+                print(f"   {name} parameter count mismatch: got {actual_params:,}, expected {expected:,}")
             else:
-                print(f"  ✓ {name} parameter count OK: {actual_params:,}")
+                print(f"   {name} parameter count OK: {actual_params:,}")
                 
         except Exception as e:
-            print(f"  ✗ {name} parameter counting failed: {e}")
+            print(f"   {name} parameter counting failed: {e}")
             return False
     
     return True
@@ -172,12 +172,12 @@ def test_model_sequential_inference():
             outputs = torch.stack(outputs, dim=0)
             
             if torch.allclose(outputs[0], outputs[-1], atol=1e-3):
-                print(f"  ⚠ {name} outputs too similar (may not be using memory)")
+                print(f"   {name} outputs too similar (may not be using memory)")
             else:
-                print(f"  ✓ {name} sequential inference working (outputs vary)")
+                print(f"   {name} sequential inference working (outputs vary)")
                 
         except Exception as e:
-            print(f"  ✗ {name} sequential inference failed: {e}")
+            print(f"   {name} sequential inference failed: {e}")
             return False
     
     return True
@@ -208,10 +208,10 @@ def test_model_device_compatibility():
                 output, _ = model_dev(inputs)
             
             assert output.device.type == device
-            print(f"  ✓ Device {device} compatibility OK")
+            print(f"   Device {device} compatibility OK")
             
         except Exception as e:
-            print(f"  ✗ Device {device} compatibility failed: {e}")
+            print(f"   Device {device} compatibility failed: {e}")
             return False
     
     return True
@@ -246,10 +246,10 @@ def test_input_shapes():
             expected_shape = (batch_size, 3)
             assert output.shape == expected_shape
             
-            print(f"  ✓ Input shape ({batch_size}, {height}, {width}) OK")
+            print(f"   Input shape ({batch_size}, {height}, {width}) OK")
             
         except Exception as e:
-            print(f"  ✗ Input shape ({batch_size}, {height}, {width}) failed: {e}")
+            print(f"   Input shape ({batch_size}, {height}, {width}) failed: {e}")
             return False
     
     return True
@@ -286,10 +286,10 @@ def main():
     print(f"Test Results: {passed}/{total} passed")
     
     if passed == total:
-        print("🎉 All model tests passed!")
+        print(" All model tests passed!")
         return True
     else:
-        print("❌ Some tests failed!")
+        print(" Some tests failed!")
         return False
 
 

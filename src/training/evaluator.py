@@ -16,6 +16,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import logging
 from pathlib import Path
 import json
+import os
 
 from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
 from .data_loader import VitFlyDataLoader
@@ -250,4 +251,233 @@ class ModelEvaluator:
                 # Prepare inputs
                 model_inputs = [image, desired_velocity, quaternion]
                 if hidden_state is not None:
-                    model_inputs.append(hidden_state)\n                # Forward pass\n                pred, hidden_state = self.model(model_inputs)\n                \n                # Store results\n                predictions.append(pred.cpu().numpy()[0])\n                targets.append((velocity_command / desired_velocity.cpu().numpy()[0]).numpy())\n        \n        predictions = np.array(predictions)\n        targets = np.array(targets)\n        \n        # Compute trajectory metrics\n        metrics = self._compute_metrics(\n            predictions, targets, \n            np.ones((len(predictions), 1)),  # Dummy velocities\n            np.mean((predictions - targets) ** 2, axis=1),\n            np.mean((predictions - targets) ** 2)\n        )\n        \n        return {\n            'metrics': metrics,\n            'predictions': predictions.tolist(),\n            'targets': targets.tolist(),\n            'trajectory_length': len(predictions)\n        }\n    \n    def visualize_predictions(self, predictions: np.ndarray, targets: np.ndarray,\n                            save_path: Optional[str] = None) -> None:\n        \"\"\"Visualize prediction results\n        \n        Args:\n            predictions: Model predictions (N, 3)\n            targets: Ground truth targets (N, 3)\n            save_path: Optional path to save plots\n        \"\"\"\n        fig, axes = plt.subplots(2, 3, figsize=(15, 10))\n        axis_names = ['X (Forward)', 'Y (Left)', 'Z (Up)']\n        \n        # Scatter plots for each axis\n        for i in range(3):\n            ax = axes[0, i]\n            ax.scatter(targets[:, i], predictions[:, i], alpha=0.6, s=1)\n            ax.plot([targets[:, i].min(), targets[:, i].max()], \n                   [targets[:, i].min(), targets[:, i].max()], 'r--', lw=2)\n            ax.set_xlabel(f'True {axis_names[i]}')\n            ax.set_ylabel(f'Predicted {axis_names[i]}')\n            ax.set_title(f'{axis_names[i]} Velocity')\n            ax.grid(True, alpha=0.3)\n            \n            # Add correlation coefficient\n            corr = np.corrcoef(predictions[:, i], targets[:, i])[0, 1]\n            ax.text(0.05, 0.95, f'r = {corr:.3f}', transform=ax.transAxes, \n                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))\n        \n        # Error histograms\n        for i in range(3):\n            ax = axes[1, i]\n            errors = predictions[:, i] - targets[:, i]\n            ax.hist(errors, bins=50, alpha=0.7, density=True)\n            ax.set_xlabel(f'{axis_names[i]} Error')\n            ax.set_ylabel('Density')\n            ax.set_title(f'{axis_names[i]} Error Distribution')\n            ax.grid(True, alpha=0.3)\n            \n            # Add statistics\n            mean_error = np.mean(errors)\n            std_error = np.std(errors)\n            ax.axvline(mean_error, color='red', linestyle='--', label=f'Mean: {mean_error:.3f}')\n            ax.text(0.05, 0.95, f'μ = {mean_error:.3f}\\nσ = {std_error:.3f}', \n                   transform=ax.transAxes, \n                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))\n        \n        plt.tight_layout()\n        \n        if save_path:\n            plt.savefig(save_path, dpi=300, bbox_inches='tight')\n            self.logger.info(f\"Visualization saved to {save_path}\")\n        \n        plt.show()\n    \n    def create_evaluation_report(self, data_loader: VitFlyDataLoader,\n                               output_dir: str) -> Dict[str, Any]:\n        \"\"\"Create comprehensive evaluation report\n        \n        Args:\n            data_loader: Data loader for evaluation\n            output_dir: Directory to save report\n            \n        Returns:\n            Dictionary with full evaluation results\n        \"\"\"\n        output_path = Path(output_dir)\n        output_path.mkdir(parents=True, exist_ok=True)\n        \n        # Evaluate on validation set\n        val_metrics = self.evaluate_dataset(data_loader, 'val')\n        \n        # Evaluate on training set (subset)\n        train_metrics = self.evaluate_dataset(data_loader, 'train')\n        \n        # Create visualizations\n        # Re-run evaluation to get predictions for plotting\n        predictions, targets = self._get_predictions_for_visualization(data_loader.val_loader)\n        \n        # Save prediction plots\n        plot_path = output_path / 'prediction_analysis.png'\n        self.visualize_predictions(predictions, targets, str(plot_path))\n        \n        # Create summary report\n        report = {\n            'model_info': {\n                'model_type': self.model_type,\n                'model_path': self.model_path,\n                'device': str(self.device)\n            },\n            'validation_metrics': val_metrics,\n            'training_metrics': train_metrics,\n            'data_info': data_loader.get_data_statistics()\n        }\n        \n        # Save report as JSON\n        report_path = output_path / 'evaluation_report.json'\n        with open(report_path, 'w') as f:\n            json.dump(report, f, indent=2)\n        \n        # Create readable summary\n        summary_path = output_path / 'evaluation_summary.txt'\n        self._create_text_summary(report, summary_path)\n        \n        self.logger.info(f\"Evaluation report saved to {output_path}\")\n        return report\n    \n    def _get_predictions_for_visualization(self, data_loader) -> Tuple[np.ndarray, np.ndarray]:\n        \"\"\"Get predictions and targets for visualization\"\"\"\n        self.model.eval()\n        predictions = []\n        targets = []\n        \n        with torch.no_grad():\n            for batch in data_loader:\n                images = batch['image'].to(self.device)\n                desired_velocities = batch['desired_velocity'].to(self.device)\n                quaternions = batch['quaternion'].to(self.device)\n                velocity_commands = batch['velocity_command'].to(self.device)\n                \n                model_inputs = [images, desired_velocities, quaternions]\n                pred, _ = self.model(model_inputs)\n                \n                normalized_targets = velocity_commands / desired_velocities.unsqueeze(-1)\n                \n                predictions.append(pred.cpu().numpy())\n                targets.append(normalized_targets.cpu().numpy())\n        \n        return np.concatenate(predictions), np.concatenate(targets)\n    \n    def _create_text_summary(self, report: Dict[str, Any], summary_path: Path):\n        \"\"\"Create human-readable summary\"\"\"\n        with open(summary_path, 'w') as f:\n            f.write(\"VitFly Model Evaluation Summary\\n\")\n            f.write(\"=\" * 40 + \"\\n\\n\")\n            \n            # Model info\n            f.write(f\"Model Type: {report['model_info']['model_type']}\\n\")\n            f.write(f\"Model Path: {report['model_info']['model_path']}\\n\")\n            f.write(f\"Device: {report['model_info']['device']}\\n\\n\")\n            \n            # Validation metrics\n            val_metrics = report['validation_metrics']\n            f.write(\"Validation Metrics:\\n\")\n            f.write(\"-\" * 20 + \"\\n\")\n            f.write(f\"MSE Loss: {val_metrics['mse']:.6f}\\n\")\n            f.write(f\"RMSE: {val_metrics['rmse']:.6f}\\n\")\n            f.write(f\"MAE: {val_metrics['mae']:.6f}\\n\")\n            f.write(f\"Direction Error: {val_metrics['direction_error_deg']:.2f} degrees\\n\")\n            f.write(f\"Speed Error: {val_metrics['speed_error']:.6f}\\n\\n\")\n            \n            # Per-axis metrics\n            f.write(\"Per-Axis RMSE:\\n\")\n            f.write(f\"  X (Forward): {val_metrics['rmse_per_axis'][0]:.6f}\\n\")\n            f.write(f\"  Y (Left): {val_metrics['rmse_per_axis'][1]:.6f}\\n\")\n            f.write(f\"  Z (Up): {val_metrics['rmse_per_axis'][2]:.6f}\\n\\n\")\n            \n            # Correlations\n            f.write(\"Correlations:\\n\")\n            f.write(f\"  X: {val_metrics['correlations'][0]:.3f}\\n\")\n            f.write(f\"  Y: {val_metrics['correlations'][1]:.3f}\\n\")\n            f.write(f\"  Z: {val_metrics['correlations'][2]:.3f}\\n\\n\")\n            \n            # Data info\n            data_info = report['data_info']\n            f.write(\"Dataset Information:\\n\")\n            f.write(\"-\" * 20 + \"\\n\")\n            f.write(f\"Training Samples: {data_info['train_size']}\\n\")\n            f.write(f\"Validation Samples: {data_info['val_size']}\\n\")\n            f.write(f\"Number of Trajectories: {data_info['num_trajectories_train'] + data_info['num_trajectories_val']}\\n\")\n\n\nif __name__ == '__main__':\n    # Example evaluation\n    logging.basicConfig(level=logging.INFO)\n    \n    # Configuration\n    model_path = \"outputs/vitfly_training_20240101_120000/checkpoints/best_model.pth\"\n    model_type = \"ViTLSTM\"\n    data_dir = \"data/training_data\"\n    output_dir = \"evaluation_results\"\n    \n    # Check if model exists\n    if not os.path.exists(model_path):\n        print(f\"Model not found: {model_path}\")\n        exit(1)\n    \n    # Create evaluator\n    evaluator = ModelEvaluator(model_path, model_type)\n    \n    # Create data loader\n    data_loader = VitFlyDataLoader(\n        data_dir=data_dir,\n        batch_size=32,\n        val_split=0.2,\n        short=0  # Use all data\n    )\n    \n    # Run evaluation\n    report = evaluator.create_evaluation_report(data_loader, output_dir)\n    \n    print(\"Evaluation completed!\")\n    print(f\"Results saved to: {output_dir}\")
+                    model_inputs.append(hidden_state)
+
+                # Forward pass
+                pred, hidden_state = self.model(model_inputs)
+
+                # Store results
+                predictions.append(pred.cpu().numpy()[0])
+                normalized_target = velocity_command.cpu().numpy() / desired_velocity.cpu().numpy()[0]
+                targets.append(normalized_target)
+
+        predictions = np.array(predictions)
+        targets = np.array(targets)
+
+        # Compute trajectory metrics
+        metrics = self._compute_metrics(
+            predictions, targets,
+            np.ones((len(predictions), 1)),  # Dummy velocities
+            np.mean((predictions - targets) ** 2, axis=1),
+            np.mean((predictions - targets) ** 2)
+        )
+
+        return {
+            'metrics': metrics,
+            'predictions': predictions.tolist(),
+            'targets': targets.tolist(),
+            'trajectory_length': len(predictions)
+        }
+
+    def visualize_predictions(self, predictions: np.ndarray, targets: np.ndarray,
+                            save_path: Optional[str] = None) -> None:
+        """Visualize prediction results
+
+        Args:
+            predictions: Model predictions (N, 3)
+            targets: Ground truth targets (N, 3)
+            save_path: Optional path to save plots
+        """
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axis_names = ['X (Forward)', 'Y (Left)', 'Z (Up)']
+
+        # Scatter plots for each axis
+        for i in range(3):
+            ax = axes[0, i]
+            ax.scatter(targets[:, i], predictions[:, i], alpha=0.6, s=1)
+            ax.plot([targets[:, i].min(), targets[:, i].max()],
+                   [targets[:, i].min(), targets[:, i].max()], 'r--', lw=2)
+            ax.set_xlabel(f'True {axis_names[i]}')
+            ax.set_ylabel(f'Predicted {axis_names[i]}')
+            ax.set_title(f'{axis_names[i]} Velocity')
+            ax.grid(True, alpha=0.3)
+
+            # Add correlation coefficient
+            corr = np.corrcoef(predictions[:, i], targets[:, i])[0, 1]
+            ax.text(0.05, 0.95, f'r = {corr:.3f}', transform=ax.transAxes,
+                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+        # Error histograms
+        for i in range(3):
+            ax = axes[1, i]
+            errors = predictions[:, i] - targets[:, i]
+            ax.hist(errors, bins=50, alpha=0.7, density=True)
+            ax.set_xlabel(f'{axis_names[i]} Error')
+            ax.set_ylabel('Density')
+            ax.set_title(f'{axis_names[i]} Error Distribution')
+            ax.grid(True, alpha=0.3)
+
+            # Add statistics
+            mean_error = np.mean(errors)
+            std_error = np.std(errors)
+            ax.axvline(mean_error, color='red', linestyle='--', label=f'Mean: {mean_error:.3f}')
+            ax.text(0.05, 0.95, f'μ = {mean_error:.3f}\nσ = {std_error:.3f}',
+                   transform=ax.transAxes,
+                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            self.logger.info(f"Visualization saved to {save_path}")
+
+        plt.show()
+
+    def create_evaluation_report(self, data_loader: VitFlyDataLoader,
+                               output_dir: str) -> Dict[str, Any]:
+        """Create comprehensive evaluation report
+
+        Args:
+            data_loader: Data loader for evaluation
+            output_dir: Directory to save report
+
+        Returns:
+            Dictionary with full evaluation results
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Evaluate on validation set
+        val_metrics = self.evaluate_dataset(data_loader, 'val')
+
+        # Evaluate on training set (subset)
+        train_metrics = self.evaluate_dataset(data_loader, 'train')
+
+        # Create visualizations
+        # Re-run evaluation to get predictions for plotting
+        predictions, targets = self._get_predictions_for_visualization(data_loader.val_loader)
+
+        # Save prediction plots
+        plot_path = output_path / 'prediction_analysis.png'
+        self.visualize_predictions(predictions, targets, str(plot_path))
+
+        # Create summary report
+        report = {
+            'model_info': {
+                'model_type': self.model_type,
+                'model_path': self.model_path,
+                'device': str(self.device)
+            },
+            'validation_metrics': val_metrics,
+            'training_metrics': train_metrics,
+            'data_info': data_loader.get_data_statistics()
+        }
+
+        # Save report as JSON
+        report_path = output_path / 'evaluation_report.json'
+        with open(report_path, 'w') as f:
+            json.dump(report, f, indent=2)
+
+        # Create readable summary
+        summary_path = output_path / 'evaluation_summary.txt'
+        self._create_text_summary(report, summary_path)
+
+        self.logger.info(f"Evaluation report saved to {output_path}")
+        return report
+
+    def _get_predictions_for_visualization(self, data_loader) -> Tuple[np.ndarray, np.ndarray]:
+        """Get predictions and targets for visualization"""
+        self.model.eval()
+        predictions = []
+        targets = []
+
+        with torch.no_grad():
+            for batch in data_loader:
+                images = batch['image'].to(self.device)
+                desired_velocities = batch['desired_velocity'].to(self.device)
+                quaternions = batch['quaternion'].to(self.device)
+                velocity_commands = batch['velocity_command'].to(self.device)
+
+                model_inputs = [images, desired_velocities, quaternions]
+                pred, _ = self.model(model_inputs)
+
+                normalized_targets = velocity_commands / desired_velocities.unsqueeze(-1)
+
+                predictions.append(pred.cpu().numpy())
+                targets.append(normalized_targets.cpu().numpy())
+
+        return np.concatenate(predictions), np.concatenate(targets)
+
+    def _create_text_summary(self, report: Dict[str, Any], summary_path: Path):
+        """Create human-readable summary"""
+        with open(summary_path, 'w') as f:
+            f.write("VitFly Model Evaluation Summary\n")
+            f.write("=" * 40 + "\n\n")
+
+            # Model info
+            f.write(f"Model Type: {report['model_info']['model_type']}\n")
+            f.write(f"Model Path: {report['model_info']['model_path']}\n")
+            f.write(f"Device: {report['model_info']['device']}\n\n")
+
+            # Validation metrics
+            val_metrics = report['validation_metrics']
+            f.write("Validation Metrics:\n")
+            f.write("-" * 20 + "\n")
+            f.write(f"MSE Loss: {val_metrics['mse']:.6f}\n")
+            f.write(f"RMSE: {val_metrics['rmse']:.6f}\n")
+            f.write(f"MAE: {val_metrics['mae']:.6f}\n")
+            f.write(f"Direction Error: {val_metrics['direction_error_deg']:.2f} degrees\n")
+            f.write(f"Speed Error: {val_metrics['speed_error']:.6f}\n\n")
+
+            # Per-axis metrics
+            f.write("Per-Axis RMSE:\n")
+            f.write(f"  X (Forward): {val_metrics['rmse_per_axis'][0]:.6f}\n")
+            f.write(f"  Y (Left): {val_metrics['rmse_per_axis'][1]:.6f}\n")
+            f.write(f"  Z (Up): {val_metrics['rmse_per_axis'][2]:.6f}\n\n")
+
+            # Correlations
+            f.write("Correlations:\n")
+            f.write(f"  X: {val_metrics['correlations'][0]:.3f}\n")
+            f.write(f"  Y: {val_metrics['correlations'][1]:.3f}\n")
+            f.write(f"  Z: {val_metrics['correlations'][2]:.3f}\n\n")
+
+            # Data info
+            data_info = report['data_info']
+            f.write("Dataset Information:\n")
+            f.write("-" * 20 + "\n")
+            f.write(f"Training Samples: {data_info['train_size']}\n")
+            f.write(f"Validation Samples: {data_info['val_size']}\n")
+            f.write(f"Number of Trajectories: {data_info['num_trajectories_train'] + data_info['num_trajectories_val']}\n")
+
+
+if __name__ == '__main__':
+    # Example evaluation
+    logging.basicConfig(level=logging.INFO)
+
+    # Configuration
+    model_path = "outputs/vitfly_training_20240101_120000/checkpoints/best_model.pth"
+    model_type = "ViTLSTM"
+    data_dir = "data/training_data"
+    output_dir = "evaluation_results"
+
+    # Check if model exists
+    if not os.path.exists(model_path):
+        print(f"Model not found: {model_path}")
+        exit(1)
+
+    # Create evaluator
+    evaluator = ModelEvaluator(model_path, model_type)
+
+    # Create data loader
+    data_loader = VitFlyDataLoader(
+        data_dir=data_dir,
+        batch_size=32,
+        val_split=0.2,
+        short=0  # Use all data
+    )
+
+    # Run evaluation
+    report = evaluator.create_evaluation_report(data_loader, output_dir)
+
+    print("Evaluation completed!")
+    print(f"Results saved to: {output_dir}")

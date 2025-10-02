@@ -97,7 +97,7 @@ def test_data_loading():
             dataset = VitFlyDataset(str(data_dir), val_split=0.3, is_train=True)
             
             if len(dataset) == 0:
-                print("  ✗ Dataset is empty")
+                print("   Dataset is empty")
                 return False
             
             # Test data loading
@@ -106,30 +106,30 @@ def test_data_loading():
             
             for key in required_keys:
                 if key not in sample:
-                    print(f"  ✗ Missing key in sample: {key}")
+                    print(f"   Missing key in sample: {key}")
                     return False
             
             # Test shapes
             if sample['image'].shape != (1, 60, 90):
-                print(f"  ✗ Wrong image shape: {sample['image'].shape}")
+                print(f"   Wrong image shape: {sample['image'].shape}")
                 return False
             
-            print(f"  ✓ Data loading successful ({len(dataset)} samples)")
+            print(f"   Data loading successful ({len(dataset)} samples)")
             
             # Test data loader
             data_loader = VitFlyDataLoader(str(data_dir), batch_size=2, short=2)
             
             for batch in data_loader.train_loader:
                 if batch['image'].shape[0] != 2:
-                    print(f"  ✗ Wrong batch size: {batch['image'].shape[0]}")
+                    print(f"   Wrong batch size: {batch['image'].shape[0]}")
                     return False
                 break
             
-            print("  ✓ Data loader working correctly")
+            print("   Data loader working correctly")
             return True
             
         except Exception as e:
-            print(f"  ✗ Data loading failed: {e}")
+            print(f"   Data loading failed: {e}")
             return False
 
 
@@ -165,7 +165,7 @@ def test_training_pipeline():
             
             # Check that model was created
             if trainer.model is None:
-                print("  ✗ Model not created")
+                print("   Model not created")
                 return False
             
             # Test one training step
@@ -173,33 +173,33 @@ def test_training_pipeline():
             train_metrics = trainer.train_epoch()
             
             if 'loss' not in train_metrics:
-                print("  ✗ Training metrics missing loss")
+                print("   Training metrics missing loss")
                 return False
             
-            print(f"  ✓ Training step successful (loss: {train_metrics['loss']:.6f})")
+            print(f"   Training step successful (loss: {train_metrics['loss']:.6f})")
             
             # Test validation
             val_metrics = trainer.validate()
             
             if 'loss' not in val_metrics:
-                print("  ✗ Validation metrics missing loss")
+                print("   Validation metrics missing loss")
                 return False
             
-            print(f"  ✓ Validation successful (loss: {val_metrics['loss']:.6f})")
+            print(f"   Validation successful (loss: {val_metrics['loss']:.6f})")
             
             # Test model saving
             trainer.save_checkpoint()
             
             checkpoint_dir = trainer.workspace / 'checkpoints'
             if not any(checkpoint_dir.glob('*.pth')):
-                print("  ✗ No checkpoint files saved")
+                print("   No checkpoint files saved")
                 return False
             
-            print("  ✓ Model saving successful")
+            print("   Model saving successful")
             return True
             
         except Exception as e:
-            print(f"  ✗ Training pipeline failed: {e}")
+            print(f"   Training pipeline failed: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -227,36 +227,36 @@ def test_model_inference():
             )
             
             if len(velocity_cmd) != 3:
-                print(f"  ✗ Wrong velocity command length: {len(velocity_cmd)}")
+                print(f"   Wrong velocity command length: {len(velocity_cmd)}")
                 return False
             
             # Check if output is reasonable
             speed = np.linalg.norm(velocity_cmd)
             if speed > 20.0 or speed == 0.0:  # Sanity check
-                print(f"  ✗ Unreasonable velocity command: {velocity_cmd}")
+                print(f"   Unreasonable velocity command: {velocity_cmd}")
                 return False
             
-            print(f"  ✓ Model inference successful (velocity: {velocity_cmd})")
+            print(f"   Model inference successful (velocity: {velocity_cmd})")
             
             # Test performance
             stats = inference.get_performance_stats()
             if 'total_inferences' not in stats:
-                print("  ✗ Performance stats incomplete")
+                print("   Performance stats incomplete")
                 return False
             
-            print(f"  ✓ Performance monitoring working")
+            print(f"   Performance monitoring working")
             
             # Test benchmark
             benchmark = inference.benchmark_inference(10)
             if benchmark['num_iterations'] != 10:
-                print("  ✗ Benchmark failed")
+                print("   Benchmark failed")
                 return False
             
-            print(f"  ✓ Benchmark successful ({benchmark['average_time_ms']:.2f}ms avg)")
+            print(f"   Benchmark successful ({benchmark['average_time_ms']:.2f}ms avg)")
             return True
             
     except Exception as e:
-        print(f"  ✗ Model inference failed: {e}")
+        print(f"   Model inference failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -291,24 +291,24 @@ def test_evaluation():
             required_metrics = ['loss', 'mse', 'rmse', 'mae']
             for metric in required_metrics:
                 if metric not in metrics:
-                    print(f"  ✗ Missing metric: {metric}")
+                    print(f"   Missing metric: {metric}")
                     return False
             
-            print(f"  ✓ Evaluation successful (RMSE: {metrics['rmse']:.6f})")
+            print(f"   Evaluation successful (RMSE: {metrics['rmse']:.6f})")
             
             # Test report generation
             report_dir = Path(temp_dir) / "evaluation_report"
             report = evaluator.create_evaluation_report(data_loader, str(report_dir))
             
             if not (report_dir / 'evaluation_report.json').exists():
-                print("  ✗ Evaluation report not created")
+                print("   Evaluation report not created")
                 return False
             
-            print("  ✓ Evaluation report generated successfully")
+            print("   Evaluation report generated successfully")
             return True
             
         except Exception as e:
-            print(f"  ✗ Evaluation failed: {e}")
+            print(f"   Evaluation failed: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -348,10 +348,10 @@ def test_end_to_end_workflow():
             # Check that model was saved
             latest_model = trainer.workspace / 'checkpoints' / 'latest_model.pth'
             if not latest_model.exists():
-                print("  ✗ Trained model not found")
+                print("   Trained model not found")
                 return False
             
-            print("  ✓ Step 1: Model training completed")
+            print("   Step 1: Model training completed")
             
             # Step 2: Test inference with trained model
             inference = ModelInference(str(latest_model), 'ConvNet', 'cpu')
@@ -361,7 +361,7 @@ def test_end_to_end_workflow():
                 dummy_depth, 5.0, (1.0, 0.0, 0.0, 0.0)
             )
             
-            print(f"  ✓ Step 2: Inference working (velocity: {velocity_cmd})")
+            print(f"   Step 2: Inference working (velocity: {velocity_cmd})")
             
             # Step 3: Evaluate the model
             data_loader = VitFlyDataLoader(
@@ -371,13 +371,13 @@ def test_end_to_end_workflow():
             evaluator = ModelEvaluator(str(latest_model), 'ConvNet', 'cpu')
             metrics = evaluator.evaluate_dataset(data_loader, 'val')
             
-            print(f"  ✓ Step 3: Evaluation completed (RMSE: {metrics['rmse']:.6f})")
+            print(f"   Step 3: Evaluation completed (RMSE: {metrics['rmse']:.6f})")
             
-            print("  🎉 End-to-end workflow successful!")
+            print("   End-to-end workflow successful!")
             return True
             
         except Exception as e:
-            print(f"  ✗ End-to-end workflow failed: {e}")
+            print(f"   End-to-end workflow failed: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -415,11 +415,11 @@ def main():
     print(f"System Test Results: {passed}/{total} passed")
     
     if passed == total:
-        print("🎉 All system tests passed!")
+        print(" All system tests passed!")
         print("\nVitFly-AirSim is ready for use!")
         return True
     else:
-        print("❌ Some system tests failed!")
+        print(" Some system tests failed!")
         print("\nPlease check the failed tests and fix any issues.")
         return False
 
