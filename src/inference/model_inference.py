@@ -14,14 +14,15 @@ from typing import Tuple, Optional, Any
 import logging
 
 try:
-    from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    from .vitfly_models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
 except ImportError:
     import sys
     from pathlib import Path
-    src_path = Path(__file__).parent.parent
-    if str(src_path) not in sys.path:
-        sys.path.insert(0, str(src_path))
-    from models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    # Try to import from same directory
+    current_dir = Path(__file__).parent
+    if str(current_dir) not in sys.path:
+        sys.path.insert(0, str(current_dir))
+    from vitfly_models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
 
 
 class ModelInference:
