@@ -7,9 +7,14 @@ including data loading, training loops, and model evaluation.
 Author: Adapted from original VitFly project
 """
 
-from .data_loader import VitFlyDataLoader, create_data_loaders
-from .trainer import VitFlyTrainer
-from .evaluator import ModelEvaluator
+try:
+    from .data_loader import VitFlyDataLoader, create_data_loaders
+    from .trainer import VitFlyTrainer
+    from .evaluator import ModelEvaluator
+except ImportError:
+    from data_loader import VitFlyDataLoader, create_data_loaders
+    from trainer import VitFlyTrainer
+    from evaluator import ModelEvaluator
 
 __all__ = [
     'VitFlyDataLoader',

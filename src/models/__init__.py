@@ -12,14 +12,24 @@ Author: Adapted from original VitFly project (GRASP Lab, UPenn)
 License: MIT
 """
 
-from .vit_models import ViT, ViTLSTM
-from .conv_models import ConvNet, LSTMNet, UNetConvLSTMNet
-from .vit_submodules import (
-    OverlapPatchMerging,
-    EfficientSelfAttention,
-    MixFFN,
-    MixTransformerEncoderLayer
-)
+try:
+    from .vit_models import ViT, ViTLSTM
+    from .conv_models import ConvNet, LSTMNet, UNetConvLSTMNet
+    from .vit_submodules import (
+        OverlapPatchMerging,
+        EfficientSelfAttention,
+        MixFFN,
+        MixTransformerEncoderLayer
+    )
+except ImportError:
+    from vit_models import ViT, ViTLSTM
+    from conv_models import ConvNet, LSTMNet, UNetConvLSTMNet
+    from vit_submodules import (
+        OverlapPatchMerging,
+        EfficientSelfAttention,
+        MixFFN,
+        MixTransformerEncoderLayer
+    )
 
 __all__ = [
     'ViT',

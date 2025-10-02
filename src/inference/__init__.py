@@ -7,6 +7,9 @@ drone control and simulation.
 Author: Adapted from original VitFly project
 """
 
-from .model_inference import ModelInference
+try:
+    from .model_inference import ModelInference
+except ImportError:
+    from model_inference import ModelInference
 
 __all__ = ['ModelInference']

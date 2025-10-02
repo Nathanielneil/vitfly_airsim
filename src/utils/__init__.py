@@ -7,9 +7,14 @@ configuration, visualization, and other common tasks.
 Author: Adapted from original VitFly project
 """
 
-from .logging_setup import setup_logging
-from .config_loader import load_config, validate_config
-from .performance_monitor import PerformanceMonitor
+try:
+    from .logging_setup import setup_logging
+    from .config_loader import load_config, validate_config
+    from .performance_monitor import PerformanceMonitor
+except ImportError:
+    from logging_setup import setup_logging
+    from config_loader import load_config, validate_config
+    from performance_monitor import PerformanceMonitor
 
 __all__ = [
     'setup_logging',
