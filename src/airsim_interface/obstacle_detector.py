@@ -39,27 +39,37 @@ class Obstacle:
 
 class ObstacleDetector:
     """Detects obstacles from sensor data and implements expert avoidance policy"""
-    
-    def __init__(self, sensor_manager: SensorManager):
+
+    def __init__(self, sensor_manager: SensorManager, config: Optional[Dict] = None):
         """Initialize obstacle detector
-        
+
         Args:
             sensor_manager: Sensor manager instance
+            config: Optional configuration dictionary
         """
         self.sensor_manager = sensor_manager
         self.logger = logging.getLogger(__name__)
-        
+
         # Detection parameters
         self.min_obstacle_distance = 0.5  # Minimum distance to consider as obstacle
         self.max_detection_range = 20.0   # Maximum detection range
         self.depth_threshold = 0.1        # Depth threshold for obstacle detection
-        
-        # Expert policy parameters
-        self.obstacle_inflation_factor = 0.6
-        self.obstacle_distance_threshold = 8.0
-        self.grid_center_offset = 8.0
-        self.grid_displacement = 0.5
-        self.x_displacement = 8.0
+
+        # Expert policy parameters (with config override)
+        if config is None:
+            config = {}
+        self.obstacle_inflation_factor = config.get('obstacle_inflation_factor', 0.6)
+        self.obstacle_distance_threshold = config.get('obstacle_distance_threshold', 8.0)
+        self.grid_center_offset = config.get('grid_center_offset', 8.0)
+        self.grid_displacement = config.get('grid_displacement', 0.5)
+        self.x_displacement = config.get('x_displacement', 8.0)
+
+        self.logger.info(f"Obstacle detector initialized with parameters:")
+        self.logger.info(f"  - Inflation factor: {self.obstacle_inflation_factor}")
+        self.logger.info(f"  - Distance threshold: {self.obstacle_distance_threshold}m")
+        self.logger.info(f"  - Grid center offset: {self.grid_center_offset}m")
+        self.logger.info(f"  - Grid displacement: {self.grid_displacement}m")
+        self.logger.info(f"  - X displacement: {self.x_displacement}m")
         
         # Detected obstacles cache
         self.detected_obstacles: List[Obstacle] = []

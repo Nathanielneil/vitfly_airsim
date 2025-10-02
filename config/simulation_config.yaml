@@ -8,10 +8,10 @@ airsim_host: "127.0.0.1"       # AirSim server host
 airsim_port: 41451             # AirSim server port
 
 # Flight Parameters
-desired_velocity: 5.0          # Desired forward velocity (m/s)
+desired_velocity: 2.0          # Desired forward velocity (m/s) - reduced for safer navigation
 flight_altitude: -5.0          # Flight altitude in AirSim coordinates (negative = up)
-max_duration: 30.0             # Maximum flight duration (seconds)
-control_frequency: 10.0        # Control loop frequency (Hz)
+max_duration: 60.0             # Maximum flight duration (seconds) - increased for longer test
+control_frequency: 20.0        # Control loop frequency (Hz) - increased for faster response
 stop_on_collision: true        # Stop simulation on collision
 
 # Model Configuration (for model mode)
@@ -35,16 +35,16 @@ show_velocity_commands: true   # Show velocity command arrows
 enable_safety: true           # Enable safety features
 min_altitude: -50.0           # Minimum altitude (AirSim coordinates)
 max_altitude: -2.0            # Maximum altitude (AirSim coordinates)
-safety_distance: 2.0          # Minimum distance from obstacles
+safety_distance: 3.0          # Minimum distance from obstacles (increased for safety)
 
 # Obstacle Detection
-obstacle_inflation_factor: 0.6    # Obstacle inflation for safety
-obstacle_distance_threshold: 8.0  # Maximum distance to consider obstacles
-grid_center_offset: 8.0          # Grid center offset for path planning
-grid_displacement: 0.5           # Grid resolution for path planning
+obstacle_inflation_factor: 1.0    # Obstacle inflation for safety (increased)
+obstacle_distance_threshold: 10.0 # Maximum distance to consider obstacles (increased)
+grid_center_offset: 10.0         # Grid center offset for path planning (increased)
+grid_displacement: 0.3           # Grid resolution for path planning (finer resolution)
 
 # Expert Policy Parameters
-x_displacement: 8.0           # Forward displacement for waypoints
+x_displacement: 5.0           # Forward displacement for waypoints (reduced for tighter turns)
 
 # Logging
 log_performance: true         # Log performance metrics

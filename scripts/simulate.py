@@ -77,7 +77,7 @@ class SimulationRunner:
             # Create components
             self.sensor_manager = SensorManager(self.client.client, self.client.drone_name)
             self.controller = DroneController(self.client, self.sensor_manager)
-            self.obstacle_detector = ObstacleDetector(self.sensor_manager)
+            self.obstacle_detector = ObstacleDetector(self.sensor_manager, self.config)
             
             # Load model if specified
             if self.config.get('use_model', False):
