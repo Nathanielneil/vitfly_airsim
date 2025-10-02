@@ -98,6 +98,7 @@
   },
   "SubWindows": [
     {"WindowID": 0, "CameraName": "FrontCamera", "ImageType": 0, "VehicleName": "Drone1", "Visible": true, "External": false},
-    {"WindowID": 1, "CameraName": "DepthCamera", "ImageType": 1, "VehicleName": "Drone1", "Visible": true, "External": false}
+    {"WindowID": 1, "CameraName": "DepthCamera", "ImageType": 1, "VehicleName": "Drone1", "Visible": true, "External": false},
+    {"WindowID": 2, "CameraName": "DepthCamera", "ImageType": 2, "VehicleName": "Drone1", "Visible": true, "External": false}
   ]
 }
