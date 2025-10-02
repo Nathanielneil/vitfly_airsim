@@ -67,10 +67,12 @@ class SensorManager:
 
             response = responses[0]
 
-            # Debug: Print response details
-            self.logger.info(f"Depth image response - Width: {response.width}, Height: {response.height}")
-            self.logger.info(f"Image data types available - float: {len(response.image_data_float) if response.image_data_float else 0}, "
-                           f"uint8: {len(response.image_data_uint8) if response.image_data_uint8 else 0}")
+            # Debug: Print response details (only on first call)
+            if not hasattr(self, '_depth_logged'):
+                self.logger.info(f"Depth image response - Width: {response.width}, Height: {response.height}")
+                self.logger.info(f"Image data types available - float: {len(response.image_data_float) if response.image_data_float else 0}, "
+                               f"uint8: {len(response.image_data_uint8) if response.image_data_uint8 else 0}")
+                self._depth_logged = True
 
             # Check if image data is available
             if response.width == 0 or response.height == 0:
