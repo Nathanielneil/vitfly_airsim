@@ -42,9 +42,9 @@ class DroneController:
         self.control_frequency = 30.0  # Hz
         self.control_period = 1.0 / self.control_frequency
         
-        # Safety parameters
-        self.min_altitude = -50.0  # Minimum altitude (AirSim coordinates)
-        self.max_altitude = -2.0   # Maximum altitude (AirSim coordinates)
+        # Safety parameters (AirSim NED coordinates: negative z is up)
+        self.min_altitude = -20.0  # Minimum altitude (highest point, most negative)
+        self.max_altitude = -1.0   # Maximum altitude (lowest point, least negative)
         self.safety_distance = 2.0  # Minimum distance from obstacles
         
         # Current state
@@ -113,13 +113,15 @@ class DroneController:
         x, y, z = position
         
         # Altitude safety checks (AirSim uses NED coordinates, so negative z is up)
-        if z > self.min_altitude:  # Too low
-            vz = max(0.0, vz)  # Only allow upward movement
-            self.logger.warning(f"Altitude safety: too low ({z:.2f}), limiting downward velocity")
-        
-        if z < self.max_altitude:  # Too high
-            vz = min(0.0, vz)  # Only allow downward movement
-            self.logger.warning(f"Altitude safety: too high ({z:.2f}), limiting upward velocity")
+        # Too low (z too close to 0, not negative enough)
+        if z > self.max_altitude:
+            vz = min(0.0, vz)  # Only allow upward movement (more negative z)
+            self.logger.warning(f"Altitude safety: too low ({z:.2f}m), limiting downward velocity")
+
+        # Too high (z too negative)
+        if z < self.min_altitude:
+            vz = max(0.0, vz)  # Only allow downward movement (less negative z)
+            self.logger.warning(f"Altitude safety: too high ({z:.2f}m), limiting upward velocity")
         
         # Check for obstacles using depth camera
         depth_img = self.sensor_manager.get_depth_image()

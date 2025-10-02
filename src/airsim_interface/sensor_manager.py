@@ -61,14 +61,32 @@ class SensorManager:
                 airsim.ImageType.DepthPlanar,
                 vehicle_name=self.drone_name
             )
-            
+
             if response is None or len(response) == 0:
                 self.logger.warning("Empty depth image response")
                 return None
-            
+
             # Convert to numpy array (D435i native resolution: 848x480)
             depth_img = np.frombuffer(response, dtype=np.float32)
-            depth_img = depth_img.reshape(self.native_height, self.native_width)
+
+            # Check if buffer size matches expected dimensions
+            expected_size = self.native_height * self.native_width
+            if depth_img.size != expected_size:
+                self.logger.warning(f"Unexpected depth image size: {depth_img.size}, expected {expected_size}")
+                # Try to infer actual dimensions from buffer size
+                # AirSim might be using different resolution than configured
+                actual_pixels = depth_img.size
+                # Try common aspect ratios
+                if actual_pixels == 256 * 144:  # Default AirSim resolution
+                    actual_height, actual_width = 144, 256
+                elif actual_pixels == 640 * 480:
+                    actual_height, actual_width = 480, 640
+                else:
+                    self.logger.error(f"Cannot determine image dimensions from buffer size: {actual_pixels}")
+                    return None
+                depth_img = depth_img.reshape(actual_height, actual_width)
+            else:
+                depth_img = depth_img.reshape(self.native_height, self.native_width)
 
             # Handle invalid depth values
             depth_img[depth_img > 100] = 100  # Clamp far distances
