@@ -16,9 +16,15 @@ import json
 from typing import Optional, Dict, Any, List
 import logging
 from pathlib import Path
-from .airsim_client import AirSimClient
-from .sensor_manager import SensorManager
-from .obstacle_detector import ObstacleDetector
+
+try:
+    from .airsim_client import AirSimClient
+    from .sensor_manager import SensorManager
+    from .obstacle_detector import ObstacleDetector
+except ImportError:
+    from airsim_client import AirSimClient
+    from sensor_manager import SensorManager
+    from obstacle_detector import ObstacleDetector
 
 
 class DataCollector:

@@ -13,8 +13,13 @@ import time
 from typing import Optional, Tuple, List, Dict, Any
 import logging
 import math
-from .airsim_client import AirSimClient
-from .sensor_manager import SensorManager
+
+try:
+    from .airsim_client import AirSimClient
+    from .sensor_manager import SensorManager
+except ImportError:
+    from airsim_client import AirSimClient
+    from sensor_manager import SensorManager
 
 
 class DroneController:

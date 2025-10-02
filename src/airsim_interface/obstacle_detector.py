@@ -12,7 +12,11 @@ import cv2
 from typing import List, Tuple, Optional, Dict, Any
 import logging
 import time
-from .sensor_manager import SensorManager
+
+try:
+    from .sensor_manager import SensorManager
+except ImportError:
+    from sensor_manager import SensorManager
 
 
 class Obstacle:
