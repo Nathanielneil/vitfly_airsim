@@ -58,31 +58,43 @@ class SensorManager:
         try:
             # Get depth image from AirSim using Images API (returns uncompressed data)
             responses = self.client.simGetImages([
-                airsim.ImageRequest(camera_name, airsim.ImageType.DepthPlanar, False, False)
+                airsim.ImageRequest(camera_name, airsim.ImageType.DepthPlanar, pixels_as_float=True, compress=False)
             ], vehicle_name=self.drone_name)
 
             if not responses or len(responses) == 0:
-                self.logger.warning("Empty depth image response")
+                self.logger.error(f"No response from simGetImages for camera: {camera_name}")
                 return None
 
             response = responses[0]
 
+            # Debug: Print response details
+            self.logger.info(f"Depth image response - Width: {response.width}, Height: {response.height}")
+            self.logger.info(f"Image data types available - float: {len(response.image_data_float) if response.image_data_float else 0}, "
+                           f"uint8: {len(response.image_data_uint8) if response.image_data_uint8 else 0}")
+
             # Check if image data is available
             if response.width == 0 or response.height == 0:
-                self.logger.warning("Invalid image dimensions")
+                self.logger.error(f"Invalid image dimensions: {response.width}x{response.height}")
                 return None
 
-            # Get image data
+            # Get image data (try float first, then uint8)
             img_data = response.image_data_float
             if img_data is None or len(img_data) == 0:
-                self.logger.warning("Empty depth image data")
-                return None
-
-            # Convert to numpy array (already float32 from AirSim)
-            depth_img = np.array(img_data, dtype=np.float32)
-
-            # Reshape using actual dimensions from AirSim response
-            depth_img = depth_img.reshape(response.height, response.width)
+                self.logger.warning("image_data_float is empty, trying image_data_uint8")
+                img_data = response.image_data_uint8
+                if img_data is None or len(img_data) == 0:
+                    self.logger.error("Both image_data_float and image_data_uint8 are empty")
+                    return None
+                # Convert uint8 to float
+                self.logger.info("Using uint8 depth data, converting to float")
+                depth_img = np.array(img_data, dtype=np.float32)
+                depth_img = depth_img.reshape(response.height, response.width)
+                # Uint8 depth is usually normalized, scale back to meters
+                depth_img = depth_img * 100.0 / 255.0  # Assume max 100m range
+            else:
+                # Convert to numpy array (already float32 from AirSim)
+                depth_img = np.array(img_data, dtype=np.float32)
+                depth_img = depth_img.reshape(response.height, response.width)
 
             # Handle invalid depth values
             depth_img[depth_img > 100] = 100  # Clamp far distances
