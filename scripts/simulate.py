@@ -119,14 +119,15 @@ class SimulationRunner:
         if abs(self.client.get_position()[2] - target_altitude) > 1.0:
             self.controller.move_to_position(0, 0, target_altitude, velocity=2.0)
 
-        # Clear collision state (may have false positives from takeoff ground contact)
-        self.client.client.simPrintLogMessage("Clearing collision state after takeoff", vehicle_name=self.client.drone_name)
-        # AirSim doesn't have a direct reset collision API, so we just log current state
+        # Check and log collision state after takeoff
+        # AirSim doesn't have a direct reset collision API, so we just track the timestamp
         collision_info = self.client.get_collision_info()
         if collision_info.get('has_collided', False):
             self.logger.warning(f"Collision state detected after takeoff (likely ground contact during takeoff): "
                               f"Object: {collision_info.get('object_name', 'unknown')}")
-            self.logger.info("Ignoring initial collision state - will monitor new collisions only")
+            # Set the initial timestamp to ignore this collision
+            self.last_collision_timestamp = collision_info.get('time_stamp', 0)
+            self.logger.info(f"Ignoring initial collision (timestamp: {self.last_collision_timestamp}) - will monitor new collisions only")
 
         self.logger.info("Takeoff completed")
     
