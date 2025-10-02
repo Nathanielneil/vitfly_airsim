@@ -267,17 +267,21 @@ class AirSimClient:
     
     def check_collision(self) -> bool:
         """Check if drone has collided
-        
+
         Returns:
             True if collision detected, False otherwise
         """
         if not self.is_connected:
             return False
-            
+
         try:
             collision_info = self.client.simGetCollisionInfo(self.drone_name)
+            if collision_info.has_collided:
+                self.logger.debug(f"Collision detected - Object: {collision_info.object_name}, "
+                                f"Impact point: {collision_info.impact_point}, "
+                                f"Penetration depth: {collision_info.penetration_depth}")
             return collision_info.has_collided
-            
+
         except Exception as e:
             self.logger.error(f"Error checking collision: {e}")
             return False

@@ -44,7 +44,7 @@ class SimulationRunner:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.running = False
-        
+
         # Initialize components
         self.client = None
         self.controller = None
@@ -53,6 +53,9 @@ class SimulationRunner:
         self.model_inference = None
         self.data_collector = None
         self.visualizer = None
+
+        # Track collision state
+        self.last_collision_timestamp = 0
         
     def setup(self):
         """Setup simulation components"""
@@ -104,18 +107,27 @@ class SimulationRunner:
     def takeoff(self):
         """Takeoff sequence"""
         self.logger.info("Starting takeoff sequence...")
-        
+
         if not self.client.takeoff():
             raise RuntimeError("Takeoff failed")
-        
+
         # Wait for stabilization
         time.sleep(2)
-        
+
         # Move to desired altitude if specified
         target_altitude = self.config.get('flight_altitude', -5.0)  # AirSim coordinates
         if abs(self.client.get_position()[2] - target_altitude) > 1.0:
             self.controller.move_to_position(0, 0, target_altitude, velocity=2.0)
-        
+
+        # Clear collision state (may have false positives from takeoff ground contact)
+        self.client.client.simPrintLogMessage("Clearing collision state after takeoff", vehicle_name=self.client.drone_name)
+        # AirSim doesn't have a direct reset collision API, so we just log current state
+        collision_info = self.client.get_collision_info()
+        if collision_info.get('has_collided', False):
+            self.logger.warning(f"Collision state detected after takeoff (likely ground contact during takeoff): "
+                              f"Object: {collision_info.get('object_name', 'unknown')}")
+            self.logger.info("Ignoring initial collision state - will monitor new collisions only")
+
         self.logger.info("Takeoff completed")
     
     def run_expert_policy(self):
@@ -158,12 +170,18 @@ class SimulationRunner:
             # Visualization
             if self.visualizer:
                 self.visualizer.update(depth_image, velocity_command, obstacles)
-            
-            # Check for collision
-            if self.client.check_collision():
-                self.logger.warning("Collision detected!")
-                if self.config.get('stop_on_collision', True):
-                    break
+
+            # Check for new collision (not just persistent collision state)
+            collision_info = self.client.get_collision_info()
+            if collision_info.get('has_collided', False):
+                collision_time = collision_info.get('time_stamp', 0)
+                # Only report if this is a new collision (different timestamp)
+                if collision_time > self.last_collision_timestamp:
+                    self.logger.warning(f"New collision detected! Object: {collision_info.get('object_name', 'unknown')}, "
+                                      f"Penetration: {collision_info.get('penetration_depth', 0):.3f}m")
+                    self.last_collision_timestamp = collision_time
+                    if self.config.get('stop_on_collision', True):
+                        break
             
             # Maintain control frequency
             elapsed = time.time() - loop_start
@@ -218,12 +236,18 @@ class SimulationRunner:
                 # Convert depth for visualization
                 vis_depth = depth_image.squeeze().cpu().numpy() if hasattr(depth_image, 'cpu') else depth_image.squeeze()
                 self.visualizer.update_model_prediction(vis_depth, velocity_command)
-            
-            # Check for collision
-            if self.client.check_collision():
-                self.logger.warning("Collision detected!")
-                if self.config.get('stop_on_collision', True):
-                    break
+
+            # Check for new collision (not just persistent collision state)
+            collision_info = self.client.get_collision_info()
+            if collision_info.get('has_collided', False):
+                collision_time = collision_info.get('time_stamp', 0)
+                # Only report if this is a new collision (different timestamp)
+                if collision_time > self.last_collision_timestamp:
+                    self.logger.warning(f"New collision detected! Object: {collision_info.get('object_name', 'unknown')}, "
+                                      f"Penetration: {collision_info.get('penetration_depth', 0):.3f}m")
+                    self.last_collision_timestamp = collision_time
+                    if self.config.get('stop_on_collision', True):
+                        break
             
             # Maintain control frequency
             elapsed = time.time() - loop_start
