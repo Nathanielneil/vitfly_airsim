@@ -419,15 +419,24 @@ def main():
     
     # Create and run simulation
     runner = SimulationRunner(config)
-    
+
+    # Track signal count to force exit on second signal
+    signal_count = [0]
+
     # Setup signal handler for graceful shutdown
     def signal_handler(signum, frame):
-        logger.info("Received shutdown signal")
-        runner.running = False
-    
+        signal_count[0] += 1
+        if signal_count[0] == 1:
+            logger.info("Received shutdown signal - stopping simulation...")
+            runner.running = False
+        else:
+            logger.warning("Received second shutdown signal - forcing exit")
+            import os
+            os._exit(1)
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     try:
         runner.run()
     except Exception as e:

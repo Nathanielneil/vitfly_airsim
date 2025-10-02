@@ -62,10 +62,19 @@ class SimulationVisualizer:
     def stop(self):
         """Stop visualization"""
         self.running = False
+
+        # Give the visualization thread time to exit cleanly
         if self.vis_thread and self.vis_thread.is_alive():
-            self.vis_thread.join(timeout=1.0)
-        
-        cv2.destroyAllWindows()
+            self.vis_thread.join(timeout=2.0)
+
+        # Force close all OpenCV windows
+        try:
+            cv2.destroyAllWindows()
+            # Call waitKey to process window close events
+            cv2.waitKey(1)
+        except Exception as e:
+            self.logger.debug(f"Error closing OpenCV windows: {e}")
+
         self.logger.info("Visualization stopped")
     
     def update(self, depth_image: np.ndarray, velocity_command: Tuple[float, float, float],
