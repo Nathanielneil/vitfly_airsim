@@ -66,8 +66,13 @@ class FlightVideoAnnotator:
         self.arrow_scale = self.config.get('arrow_scale', 30.0)
         self.show_trajectory = self.config.get('show_trajectory', True)
         self.show_stats = self.config.get('show_stats', True)
+        self.use_heatmap_colors = self.config.get('use_heatmap_colors', True)
         self.trajectory_color = (0, 255, 255)  # Cyan
         self.velocity_color = (0, 255, 0)  # Green
+
+        # Velocity range for heatmap (m/s)
+        self.min_velocity = self.config.get('min_velocity', 0.0)
+        self.max_velocity = self.config.get('max_velocity', 8.0)
 
     def load_video(self):
         """Load input video"""
@@ -127,6 +132,32 @@ class FlightVideoAnnotator:
         row = self.flight_data.iloc[frame_idx]
         return row.to_dict()
 
+    def velocity_to_heatmap_color(self, speed: float) -> Tuple[int, int, int]:
+        """Convert velocity magnitude to heatmap color (BGR format for OpenCV)
+
+        Args:
+            speed: Velocity magnitude in m/s
+
+        Returns:
+            BGR color tuple (blue, green, red)
+
+        Color mapping (from slow to fast):
+        - Blue (0 m/s) → Cyan → Green → Yellow → Orange → Red (max m/s)
+        """
+        # Normalize speed to 0-1 range
+        normalized = (speed - self.min_velocity) / (self.max_velocity - self.min_velocity)
+        normalized = np.clip(normalized, 0.0, 1.0)
+
+        # Create smooth color gradient using HSV
+        # Hue: 240 (blue) → 0 (red)
+        hue = int(240 * (1 - normalized))  # HSV hue range 0-180 in OpenCV
+
+        # Convert to BGR
+        hsv_color = np.uint8([[[hue, 255, 255]]])
+        bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
+
+        return tuple(int(c) for c in bgr_color)
+
     def draw_velocity_arrow(self, frame: np.ndarray, velocity: Tuple[float, float, float],
                            position: Tuple[int, int] = None) -> np.ndarray:
         """Draw velocity vector as arrow on frame
@@ -144,29 +175,54 @@ class FlightVideoAnnotator:
 
         vx, vy, vz = velocity
 
-        # Draw forward velocity (horizontal)
+        # Calculate speed magnitude
+        speed = np.sqrt(vx**2 + vy**2 + vz**2)
+
+        # Get color based on speed (if heatmap mode enabled)
+        if self.use_heatmap_colors:
+            arrow_color = self.velocity_to_heatmap_color(speed)
+        else:
+            arrow_color = (0, 255, 255)  # Default yellow
+
+        # Draw forward velocity component
         forward_end = (
             int(position[0] + vx * self.arrow_scale),
             position[1]
         )
-        cv2.arrowedLine(frame, position, forward_end, (255, 0, 0), 3, tipLength=0.2)
+        if self.use_heatmap_colors:
+            forward_speed = abs(vx)
+            forward_color = self.velocity_to_heatmap_color(forward_speed)
+        else:
+            forward_color = (255, 0, 0)  # Blue
+        cv2.arrowedLine(frame, position, forward_end, forward_color, 3, tipLength=0.2)
 
-        # Draw lateral velocity (green)
+        # Draw lateral/vertical velocity component
         lateral_end = (
             int(position[0] + vy * self.arrow_scale),
             int(position[1] - vz * self.arrow_scale)
         )
-        cv2.arrowedLine(frame, position, lateral_end, (0, 255, 0), 3, tipLength=0.2)
+        if self.use_heatmap_colors:
+            lateral_speed = np.sqrt(vy**2 + vz**2)
+            lateral_color = self.velocity_to_heatmap_color(lateral_speed)
+        else:
+            lateral_color = (0, 255, 0)  # Green
+        cv2.arrowedLine(frame, position, lateral_end, lateral_color, 3, tipLength=0.2)
 
-        # Draw resultant velocity (yellow)
+        # Draw resultant velocity (main arrow)
         resultant_end = (
             int(position[0] + vx * self.arrow_scale + vy * self.arrow_scale),
             int(position[1] - vz * self.arrow_scale)
         )
-        cv2.arrowedLine(frame, position, resultant_end, (0, 255, 255), 2, tipLength=0.15)
+        cv2.arrowedLine(frame, position, resultant_end, arrow_color, 4, tipLength=0.2)
 
         # Draw center point
         cv2.circle(frame, position, 5, (255, 255, 255), -1)
+
+        # Add speed text with matching color
+        speed_text = f"{speed:.1f} m/s"
+        text_pos = (position[0] - 40, position[1] - 20)
+        cv2.putText(frame, speed_text, text_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                   0.7, arrow_color, 2, cv2.LINE_AA)
 
         return frame
 
@@ -229,10 +285,38 @@ class FlightVideoAnnotator:
         time_text = f"Time: {timestamp:.2f}s"
         cv2.putText(frame, time_text, (20, y_offset + line_height * 3), font, font_scale, (200, 200, 200), font_thickness)
 
-        # Legend
+        # Legend and color bar
         legend_y = y_offset + line_height * 4 + 10
-        cv2.putText(frame, "Blue=Forward  Green=Lateral  Yellow=Resultant",
-                   (20, legend_y), font, 0.5, (200, 200, 200), 1)
+
+        if self.use_heatmap_colors:
+            # Draw velocity colorbar
+            colorbar_x = 20
+            colorbar_y = legend_y
+            colorbar_width = 200
+            colorbar_height = 20
+
+            # Create gradient colorbar
+            for i in range(colorbar_width):
+                color_speed = self.min_velocity + (i / colorbar_width) * (self.max_velocity - self.min_velocity)
+                color = self.velocity_to_heatmap_color(color_speed)
+                cv2.line(frame, (colorbar_x + i, colorbar_y), (colorbar_x + i, colorbar_y + colorbar_height),
+                        color, 1)
+
+            # Colorbar border
+            cv2.rectangle(frame, (colorbar_x, colorbar_y), (colorbar_x + colorbar_width, colorbar_y + colorbar_height),
+                         (255, 255, 255), 1)
+
+            # Labels
+            cv2.putText(frame, f"{self.min_velocity:.0f}", (colorbar_x - 5, colorbar_y + colorbar_height + 15),
+                       font, 0.4, (200, 200, 200), 1)
+            cv2.putText(frame, f"{self.max_velocity:.0f} m/s", (colorbar_x + colorbar_width - 30, colorbar_y + colorbar_height + 15),
+                       font, 0.4, (200, 200, 200), 1)
+            cv2.putText(frame, "Speed", (colorbar_x + colorbar_width // 2 - 20, colorbar_y - 5),
+                       font, 0.5, (255, 255, 255), 1)
+        else:
+            # Original legend
+            cv2.putText(frame, "Blue=Forward  Green=Lateral  Yellow=Resultant",
+                       (20, legend_y), font, 0.5, (200, 200, 200), 1)
 
         return frame
 
@@ -288,15 +372,29 @@ class FlightVideoAnnotator:
 
         # Draw trajectory
         points = []
-        for idx, row in trajectory.iterrows():
+        speeds = []
+        for _, row in trajectory.iterrows():
             px = int(map_x + map_size // 2 + (row['position_x'] - (x_min + x_max) / 2) * scale)
             py = int(map_y + map_size // 2 - (row['position_y'] - (y_min + y_max) / 2) * scale)
             points.append((px, py))
 
-        # Draw line segments with fading effect
+            # Calculate speed for color mapping
+            if 'velocity_x' in row and 'velocity_y' in row and 'velocity_z' in row:
+                speed = np.sqrt(row['velocity_x']**2 + row['velocity_y']**2 + row['velocity_z']**2)
+                speeds.append(speed)
+            else:
+                speeds.append(0.0)
+
+        # Draw line segments with speed-based colors
         for i in range(1, len(points)):
-            alpha = i / len(points)  # Fade in towards current position
-            color = tuple(int(c * alpha) for c in self.trajectory_color)
+            if self.use_heatmap_colors and speeds:
+                # Use speed-based color
+                avg_speed = (speeds[i-1] + speeds[i]) / 2
+                color = self.velocity_to_heatmap_color(avg_speed)
+            else:
+                # Use fading cyan
+                alpha = i / len(points)
+                color = tuple(int(c * alpha) for c in self.trajectory_color)
             cv2.line(frame, points[i-1], points[i], color, 2)
 
         # Draw current position
@@ -393,6 +491,12 @@ def main():
                        help='Disable trajectory trace')
     parser.add_argument('--no-stats', action='store_true',
                        help='Disable statistics panel')
+    parser.add_argument('--no-heatmap', action='store_true',
+                       help='Disable heatmap colors (use fixed colors instead)')
+    parser.add_argument('--min-velocity', type=float, default=0.0,
+                       help='Minimum velocity for heatmap color scale (m/s)')
+    parser.add_argument('--max-velocity', type=float, default=8.0,
+                       help='Maximum velocity for heatmap color scale (m/s)')
 
     args = parser.parse_args()
 
@@ -410,6 +514,9 @@ def main():
         'arrow_scale': args.arrow_scale,
         'show_trajectory': not args.no_trajectory,
         'show_stats': not args.no_stats,
+        'use_heatmap_colors': not args.no_heatmap,
+        'min_velocity': args.min_velocity,
+        'max_velocity': args.max_velocity,
     }
 
     # Create annotator and run
