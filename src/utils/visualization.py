@@ -44,9 +44,8 @@ class SimulationVisualizer:
         self.update_queue = queue.Queue(maxsize=10)
         self.vis_thread = None
         
-        # OpenCV windows
-        self.depth_window = "VitFly - Depth View"
-        self.debug_window = "VitFly - Debug View"
+        # OpenCV window (single integrated window)
+        self.main_window = "VitFly - Real-time Visualization"
         
     def start(self):
         """Start visualization"""
@@ -146,20 +145,138 @@ class SimulationVisualizer:
         depth_image = vis_data['depth_image']
         velocity_command = vis_data['velocity_command']
         obstacles = vis_data['obstacles']
-        
+
         if depth_image is None:
             return
-        
-        # Create depth visualization
-        depth_vis = self._create_depth_visualization(depth_image, velocity_command)
-        
-        # Create debug visualization
-        debug_vis = self._create_debug_visualization(depth_image, velocity_command, obstacles)
-        
-        # Display windows
-        cv2.imshow(self.depth_window, depth_vis)
-        cv2.imshow(self.debug_window, debug_vis)
-    
+
+        # Create integrated visualization (single window)
+        integrated_vis = self._create_integrated_visualization(depth_image, velocity_command, obstacles)
+
+        # Display single window
+        cv2.imshow(self.main_window, integrated_vis)
+
+    def _create_integrated_visualization(self, depth_image: np.ndarray,
+                                        velocity_command: Tuple[float, float, float],
+                                        obstacles: List) -> np.ndarray:
+        """Create integrated single-window visualization
+
+        Layout:
+        ┌─────────────────────────────────────────┐
+        │  Depth View (with arrows)               │
+        │  ┌─────────────────────────────────┐    │
+        │  │                                 │    │
+        │  │    Depth Image + Velocity       │    │
+        │  │                                 │    │
+        │  └─────────────────────────────────┘    │
+        ├─────────────────────────────────────────┤
+        │  Status Panel                           │
+        │  Velocity: (vx, vy, vz)  Speed: X.XX    │
+        │  Obstacles: N   Closest: X.XX m         │
+        │  Mode: Model/Expert  FPS: XX            │
+        └─────────────────────────────────────────┘
+        """
+
+        # Normalize depth image for display
+        if depth_image.max() <= 1.0:
+            depth_vis = (depth_image * 255).astype(np.uint8)
+        else:
+            depth_vis = np.clip(depth_image, 0, 255).astype(np.uint8)
+
+        # Convert to RGB for color overlays
+        if len(depth_vis.shape) == 2:
+            depth_vis = cv2.cvtColor(depth_vis, cv2.COLOR_GRAY2BGR)
+
+        # Resize depth image to a good viewing size (scale up from 90x60)
+        display_height = 480
+        display_width = int(display_height * depth_vis.shape[1] / depth_vis.shape[0])
+        depth_vis = cv2.resize(depth_vis, (display_width, display_height))
+
+        # Draw velocity arrows on depth image
+        h, w = depth_vis.shape[:2]
+        center = (w // 2, h // 2)
+
+        # Scale velocity for visualization
+        vel_scale = 20.0  # Pixels per m/s
+
+        # Draw lateral/vertical velocity (green arrow)
+        arrow_end_y = int(center[0] + velocity_command[1] * vel_scale)
+        arrow_end_z = int(center[1] - velocity_command[2] * vel_scale)  # Inverted Y
+        cv2.arrowedLine(depth_vis, center, (arrow_end_y, arrow_end_z),
+                       (0, 255, 0), 3, tipLength=0.2)
+
+        # Draw forward velocity (blue arrow)
+        forward_end = int(center[0] + velocity_command[0] * vel_scale)
+        cv2.arrowedLine(depth_vis, center, (forward_end, center[1]),
+                       (255, 128, 0), 3, tipLength=0.2)
+
+        # Draw center crosshair
+        cv2.circle(depth_vis, center, 5, (255, 255, 255), -1)
+        cv2.circle(depth_vis, center, 6, (0, 0, 0), 1)
+
+        # Create status panel (200 pixels high)
+        status_height = 200
+        status_panel = np.zeros((status_height, display_width, 3), dtype=np.uint8)
+        status_panel[:] = (40, 40, 40)  # Dark gray background
+
+        # Add text information to status panel
+        y_offset = 30
+        line_height = 35
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        font_thickness = 2
+        text_color = (255, 255, 255)
+
+        # Line 1: Velocity components
+        vel_text = f"Velocity: X={velocity_command[0]:+.2f} Y={velocity_command[1]:+.2f} Z={velocity_command[2]:+.2f} m/s"
+        cv2.putText(status_panel, vel_text, (10, y_offset), font, font_scale, text_color, font_thickness)
+
+        # Line 2: Speed and magnitude
+        speed = np.linalg.norm(velocity_command)
+        speed_text = f"Speed: {speed:.2f} m/s"
+        cv2.putText(status_panel, speed_text, (10, y_offset + line_height),
+                   font, font_scale, (0, 255, 255), font_thickness)
+
+        # Line 3: Obstacle info
+        num_obstacles = len(obstacles)
+        if num_obstacles > 0 and hasattr(obstacles[0], 'position'):
+            closest_dist = min([np.linalg.norm(obs.position) for obs in obstacles])
+            obs_text = f"Obstacles: {num_obstacles}   Closest: {closest_dist:.2f}m"
+        else:
+            obs_text = f"Obstacles: {num_obstacles}   Closest: N/A"
+        cv2.putText(status_panel, obs_text, (10, y_offset + line_height * 2),
+                   font, font_scale, text_color, font_thickness)
+
+        # Line 4: Legend
+        legend_text = "Blue=Forward  Green=Lateral/Vertical"
+        cv2.putText(status_panel, legend_text, (10, y_offset + line_height * 3),
+                   font, 0.6, (200, 200, 200), 1)
+
+        # Draw velocity direction indicator (small compass)
+        compass_x = display_width - 120
+        compass_y = status_height // 2
+        compass_radius = 50
+
+        # Draw compass circle
+        cv2.circle(status_panel, (compass_x, compass_y), compass_radius, (100, 100, 100), 2)
+
+        # Draw N/S/E/W labels
+        cv2.putText(status_panel, "N", (compass_x - 8, compass_y - compass_radius - 5),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
+
+        # Draw velocity vector on compass
+        vel_angle = np.arctan2(velocity_command[1], velocity_command[0])  # Y, X
+        vel_arrow_end = (
+            int(compass_x + np.cos(vel_angle) * compass_radius * 0.7),
+            int(compass_y + np.sin(vel_angle) * compass_radius * 0.7)
+        )
+        cv2.arrowedLine(status_panel, (compass_x, compass_y), vel_arrow_end,
+                       (0, 255, 255), 2, tipLength=0.3)
+
+        # Combine depth view and status panel vertically
+        integrated = np.vstack([depth_vis, status_panel])
+
+        return integrated
+
     def _create_depth_visualization(self, depth_image: np.ndarray, 
                                   velocity_command: Tuple[float, float, float]) -> np.ndarray:
         """Create depth image visualization with velocity overlay"""
