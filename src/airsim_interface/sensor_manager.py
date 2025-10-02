@@ -30,7 +30,8 @@ class SensorManager:
         self.logger = logging.getLogger(__name__)
         
         # Camera configurations
-        self.depth_camera_name = "DepthCamera"
+        # Note: In AirSim, depth is retrieved from the same camera using different ImageType
+        self.depth_camera_name = "FrontCamera"  # Use FrontCamera for depth (ImageType 1)
         self.rgb_camera_name = "FrontCamera"
 
         # Image processing parameters
