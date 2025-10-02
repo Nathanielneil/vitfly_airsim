@@ -18,8 +18,16 @@ from typing import Dict, Any, Optional, Tuple
 import logging
 from pathlib import Path
 
-from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
-from .data_loader import VitFlyDataLoader
+try:
+    from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    from .data_loader import VitFlyDataLoader
+except ImportError:
+    import sys
+    src_path = Path(__file__).parent.parent
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    from models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    from training.data_loader import VitFlyDataLoader
 
 
 class VitFlyTrainer:

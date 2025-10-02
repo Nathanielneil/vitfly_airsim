@@ -13,7 +13,15 @@ import time
 from typing import Tuple, Optional, Any
 import logging
 
-from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+try:
+    from ..models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+except ImportError:
+    import sys
+    from pathlib import Path
+    src_path = Path(__file__).parent.parent
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    from models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
 
 
 class ModelInference:
