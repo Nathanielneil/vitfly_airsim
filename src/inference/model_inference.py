@@ -57,6 +57,13 @@ class ModelInference:
         
         # Inference state
         self.hidden_state = None
+
+        # Statistics for debugging
+        self.inference_count = 0
+        self.velocity_stats = {
+            'vx': [], 'vy': [], 'vz': [],
+            'raw_x': [], 'raw_y': [], 'raw_z': []
+        }
         self.inference_times = []
         self.max_inference_history = 100
         
@@ -206,28 +213,72 @@ class ModelInference:
     
     def _process_prediction(self, prediction: torch.Tensor, desired_velocity: float) -> Tuple[float, float, float]:
         """Process model prediction to velocity command"""
-        
+
         # Convert to numpy
         pred_np = prediction.cpu().numpy().squeeze()
-        
+
+        # Store raw model output for debugging
+        raw_output = pred_np.copy()
+
         # Clamp forward velocity to reasonable range
         pred_np[0] = np.clip(pred_np[0], -1.0, 1.0)
-        
+
         # Normalize prediction vector
         pred_norm = np.linalg.norm(pred_np)
         if pred_norm > 0:
             pred_np = pred_np / pred_norm
-        
+
         # Scale by desired velocity
         velocity_command = pred_np * desired_velocity
-        
+
         # Apply safety limits
         max_velocity = 10.0  # Maximum velocity limit
         velocity_magnitude = np.linalg.norm(velocity_command)
         if velocity_magnitude > max_velocity:
             velocity_command = velocity_command * (max_velocity / velocity_magnitude)
-        
+
+        # Update statistics for debugging
+        self.inference_count += 1
+        self.velocity_stats['raw_x'].append(float(raw_output[0]))
+        self.velocity_stats['raw_y'].append(float(raw_output[1]))
+        self.velocity_stats['raw_z'].append(float(raw_output[2]))
+        self.velocity_stats['vx'].append(float(velocity_command[0]))
+        self.velocity_stats['vy'].append(float(velocity_command[1]))
+        self.velocity_stats['vz'].append(float(velocity_command[2]))
+
+        # Keep only recent history
+        if len(self.velocity_stats['vx']) > self.max_inference_history:
+            for key in self.velocity_stats:
+                self.velocity_stats[key].pop(0)
+
+        # Log detailed statistics every 30 inferences (~1 second at 30 Hz)
+        if self.inference_count % 30 == 0:
+            self._log_velocity_statistics()
+
         return tuple(velocity_command.tolist())
+
+    def _log_velocity_statistics(self):
+        """Log detailed velocity statistics for debugging"""
+        if not self.velocity_stats['vx']:
+            return
+
+        # Compute statistics for recent predictions
+        recent_raw_x = self.velocity_stats['raw_x'][-30:] if len(self.velocity_stats['raw_x']) >= 30 else self.velocity_stats['raw_x']
+        recent_raw_y = self.velocity_stats['raw_y'][-30:] if len(self.velocity_stats['raw_y']) >= 30 else self.velocity_stats['raw_y']
+        recent_raw_z = self.velocity_stats['raw_z'][-30:] if len(self.velocity_stats['raw_z']) >= 30 else self.velocity_stats['raw_z']
+
+        recent_vx = self.velocity_stats['vx'][-30:] if len(self.velocity_stats['vx']) >= 30 else self.velocity_stats['vx']
+        recent_vy = self.velocity_stats['vy'][-30:] if len(self.velocity_stats['vy']) >= 30 else self.velocity_stats['vy']
+        recent_vz = self.velocity_stats['vz'][-30:] if len(self.velocity_stats['vz']) >= 30 else self.velocity_stats['vz']
+
+        self.logger.info(f"=== Model Output Statistics (last 30 predictions) ===")
+        self.logger.info(f"Raw Output - X: mean={np.mean(recent_raw_x):.3f}, std={np.std(recent_raw_x):.3f}, min={np.min(recent_raw_x):.3f}, max={np.max(recent_raw_x):.3f}")
+        self.logger.info(f"Raw Output - Y: mean={np.mean(recent_raw_y):.3f}, std={np.std(recent_raw_y):.3f}, min={np.min(recent_raw_y):.3f}, max={np.max(recent_raw_y):.3f}")
+        self.logger.info(f"Raw Output - Z: mean={np.mean(recent_raw_z):.3f}, std={np.std(recent_raw_z):.3f}, min={np.min(recent_raw_z):.3f}, max={np.max(recent_raw_z):.3f}")
+        self.logger.info(f"Final Vel - VX: mean={np.mean(recent_vx):.3f}, std={np.std(recent_vx):.3f}, min={np.min(recent_vx):.3f}, max={np.max(recent_vx):.3f}")
+        self.logger.info(f"Final Vel - VY: mean={np.mean(recent_vy):.3f}, std={np.std(recent_vy):.3f}, min={np.min(recent_vy):.3f}, max={np.max(recent_vy):.3f}")
+        self.logger.info(f"Final Vel - VZ: mean={np.mean(recent_vz):.3f}, std={np.std(recent_vz):.3f}, min={np.min(recent_vz):.3f}, max={np.max(recent_vz):.3f}")
+        self.logger.info(f"=====================================================")
     
     def _update_performance_metrics(self, inference_time: float):
         """Update performance monitoring metrics"""
