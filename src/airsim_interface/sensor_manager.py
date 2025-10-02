@@ -57,8 +57,8 @@ class SensorManager:
         try:
             # Get depth image from AirSim
             response = self.client.simGetImage(
-                camera_name, 
-                airsim.ImageType.DepthPlanner,
+                camera_name,
+                airsim.ImageType.DepthPlanar,
                 vehicle_name=self.drone_name
             )
             

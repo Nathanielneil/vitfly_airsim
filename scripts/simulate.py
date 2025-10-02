@@ -131,13 +131,14 @@ class SimulationRunner:
         
         while self.running and (time.time() - start_time) < max_duration:
             loop_start = time.time()
-            
+
             # Get current position
             position = self.client.get_position()
             if position is None:
                 break
-            
+
             # Detect obstacles
+            obstacles = []
             depth_image = self.sensor_manager.get_depth_image()
             if depth_image is not None:
                 obstacles = self.obstacle_detector.detect_obstacles_from_depth(depth_image)
