@@ -17,10 +17,12 @@ from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+src_path = project_root / 'src'
+sys.path.insert(0, str(src_path))
+sys.path.insert(0, str(src_path / 'training'))
 
-# Direct import to avoid __init__.py relative import issues
-from training.trainer import VitFlyTrainer
+# Direct import bypassing package structure
+from trainer import VitFlyTrainer
 
 
 def setup_logging(log_level: str = 'INFO'):

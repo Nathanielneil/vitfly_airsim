@@ -18,16 +18,22 @@ from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+src_path = project_root / 'src'
+sys.path.insert(0, str(src_path))
 
-# Direct imports to avoid __init__.py relative import issues
-from airsim_interface.airsim_client import AirSimClient
-from airsim_interface.drone_controller import DroneController
-from airsim_interface.sensor_manager import SensorManager
-from airsim_interface.obstacle_detector import ObstacleDetector
-from airsim_interface.data_collector import DataCollector
-from inference.model_inference import ModelInference
-from utils.visualization import SimulationVisualizer
+# Add individual module paths to bypass __init__.py import issues
+sys.path.insert(0, str(src_path / 'airsim_interface'))
+sys.path.insert(0, str(src_path / 'inference'))
+sys.path.insert(0, str(src_path / 'utils'))
+
+# Direct imports bypassing package structure
+from airsim_client import AirSimClient
+from drone_controller import DroneController
+from sensor_manager import SensorManager
+from obstacle_detector import ObstacleDetector
+from data_collector import DataCollector
+from model_inference import ModelInference
+from visualization import SimulationVisualizer
 
 
 class SimulationRunner:
