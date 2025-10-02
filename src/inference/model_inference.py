@@ -14,7 +14,9 @@ from typing import Tuple, Optional, Any
 import logging
 
 try:
-    from .vitfly_models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    from .vitfly_models import ViT, LSTMNetVIT, ConvNet, LSTMNet, UNetConvLSTMNet
+    # Create alias for compatibility
+    ViTLSTM = LSTMNetVIT
 except ImportError:
     import sys
     from pathlib import Path
@@ -22,7 +24,9 @@ except ImportError:
     current_dir = Path(__file__).parent
     if str(current_dir) not in sys.path:
         sys.path.insert(0, str(current_dir))
-    from vitfly_models import ViT, ViTLSTM, ConvNet, LSTMNet, UNetConvLSTMNet
+    from vitfly_models import ViT, LSTMNetVIT, ConvNet, LSTMNet, UNetConvLSTMNet
+    # Create alias for compatibility
+    ViTLSTM = LSTMNetVIT
 
 
 class ModelInference:
