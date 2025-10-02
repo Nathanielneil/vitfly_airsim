@@ -18,6 +18,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
+# Direct imports to avoid __init__.py relative import issues
 from training.evaluator import ModelEvaluator
 from training.data_loader import VitFlyDataLoader
 

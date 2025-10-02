@@ -20,7 +20,12 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from airsim_interface import AirSimClient, DroneController, SensorManager, ObstacleDetector, DataCollector
+# Direct imports to avoid __init__.py relative import issues
+from airsim_interface.airsim_client import AirSimClient
+from airsim_interface.drone_controller import DroneController
+from airsim_interface.sensor_manager import SensorManager
+from airsim_interface.obstacle_detector import ObstacleDetector
+from airsim_interface.data_collector import DataCollector
 from inference.model_inference import ModelInference
 from utils.visualization import SimulationVisualizer
 
