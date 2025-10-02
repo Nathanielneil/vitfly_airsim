@@ -53,9 +53,9 @@
     "CaptureSettings": [
       {
         "ImageType": 0,
-        "Width": 256,
-        "Height": 144,
-        "FOV_Degrees": 90,
+        "Width": 848,
+        "Height": 480,
+        "FOV_Degrees": 87,
         "AutoExposureSpeed": 100,
         "AutoExposureBias": 0,
         "AutoExposureMaxBrightness": 0.64,
@@ -65,15 +65,10 @@
       },
       {
         "ImageType": 1,
-        "Width": 256,
-        "Height": 144,
-        "FOV_Degrees": 90,
-        "AutoExposureSpeed": 100,
-        "AutoExposureBias": 0,
-        "AutoExposureMaxBrightness": 0.64,
-        "AutoExposureMinBrightness": 0.03,
-        "MotionBlurAmount": 0,
-        "TargetGamma": 1.0
+        "Width": 848,
+        "Height": 480,
+        "FOV_Degrees": 87,
+        "MotionBlurAmount": 0
       }
     ]
   },

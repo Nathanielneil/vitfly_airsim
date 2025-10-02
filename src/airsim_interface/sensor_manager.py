@@ -32,10 +32,14 @@ class SensorManager:
         # Camera configurations
         self.depth_camera_name = "DepthCamera"
         self.rgb_camera_name = "FrontCamera"
-        
+
         # Image processing parameters
-        self.target_height = 60
-        self.target_width = 90
+        # Note: AirSim is configured to match D435i native resolution (848x480)
+        # Images are resized to model input size (90x60) during preprocessing
+        self.native_width = 848   # D435i native width
+        self.native_height = 480  # D435i native height
+        self.target_height = 60   # Model input height
+        self.target_width = 90    # Model input width
         self.depth_scale = 1000.0  # Convert to meters
         
     def get_depth_image(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
@@ -62,15 +66,15 @@ class SensorManager:
                 self.logger.warning("Empty depth image response")
                 return None
             
-            # Convert to numpy array
+            # Convert to numpy array (D435i native resolution: 848x480)
             depth_img = np.frombuffer(response, dtype=np.float32)
-            depth_img = depth_img.reshape(144, 256)  # AirSim default depth size
-            
+            depth_img = depth_img.reshape(self.native_height, self.native_width)
+
             # Handle invalid depth values
             depth_img[depth_img > 100] = 100  # Clamp far distances
             depth_img = np.nan_to_num(depth_img, nan=100.0, posinf=100.0, neginf=0.0)
-            
-            # Resize to target size
+
+            # Resize to target size for model input
             depth_img = cv2.resize(depth_img, (self.target_width, self.target_height))
             
             # Normalize to [0, 1] range for model input
@@ -106,10 +110,10 @@ class SensorManager:
                 self.logger.warning("Empty RGB image response")
                 return None
             
-            # Convert to numpy array
+            # Convert to numpy array (D435i native resolution: 848x480)
             img_1d = np.frombuffer(response, dtype=np.uint8)
-            img_rgb = img_1d.reshape(144, 256, 3)  # AirSim default RGB size
-            
+            img_rgb = img_1d.reshape(self.native_height, self.native_width, 3)
+
             # Convert BGR to RGB if needed
             img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2RGB)
             
