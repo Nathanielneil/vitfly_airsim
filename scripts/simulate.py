@@ -34,6 +34,7 @@ from obstacle_detector import ObstacleDetector
 from data_collector import DataCollector
 from model_inference import ModelInference
 from visualization import SimulationVisualizer
+import csv
 
 
 class SimulationRunner:
@@ -56,6 +57,12 @@ class SimulationRunner:
 
         # Track collision state
         self.last_collision_timestamp = 0
+
+        # Telemetry recording for video annotation
+        self.telemetry_file = None
+        self.telemetry_writer = None
+        self.telemetry_data = []
+        self.start_time = 0
         
     def setup(self):
         """Setup simulation components"""
