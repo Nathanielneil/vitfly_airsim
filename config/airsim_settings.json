@@ -18,14 +18,14 @@
           "CameraName": "FrontCamera",
           "ImageType": 0,
           "MotionBlurAmount": 0,
-          "X": 0.25, "Y": 0.00, "Z": 0.00,
+          "X": 0.12, "Y": 0.00, "Z": 0.00,
           "Pitch": 0.0, "Roll": 0.0, "Yaw": 0.0
         },
         "DepthCamera": {
           "CameraName": "DepthCamera",
           "ImageType": 1,
           "MotionBlurAmount": 0,
-          "X": 0.25, "Y": 0.00, "Z": 0.00,
+          "X": 0.12, "Y": 0.00, "Z": 0.00,
           "Pitch": 0.0, "Roll": 0.0, "Yaw": 0.0
         }
       },
